@@ -6,8 +6,7 @@ point_cloud_range = [-50, -50, -5, 50, 50, 3]
 
 # For nuScenes we usually do 10-class detection
 class_names = [
-    'car', 'truck', 'trailer', 'bus', 'construction_vehicle', 'bicycle',
-    'motorcycle', 'pedestrian', 'traffic_cone', 'barrier'
+    'drivable_area', 'ped_crossing', 'walkway', 'stop_line', 'carpark_area', 'divider'
 ]
 
 img_norm_cfg = dict(
@@ -50,19 +49,19 @@ train_pipeline = [
         translation_std=[0, 0, 0]
     ),
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
-    dict(
-        type='ImagAug3D', 
-        final_dim=image_size,
-        augment2d=augment2d,
-        resize_lim=load_dim,
-        bot_pct_lim=[0.0, 0.0],
-        rand_flip=True,
-        is_trian=True,
-        is_used=False
-    ),
+    # dict(
+    #     type='ImagAug', 
+    #     final_dim=image_size,
+    #     augment2d=augment2d,
+    #     resize_lim=load_dim,
+    #     bot_pct_lim=[0.0, 0.0],
+    #     rand_flip=True,
+    #     is_trian=True,
+    #     is_used=False
+    # ),
     dict(type='PadMultiViewImage', size_divisor=32),
-    dict(type='DefaultFormatBundle3D', class_names=class_names),
-    dict(type='CustomCollect3D', keys=['img', 'gt_masks_bev'])
+    dict(type='DefaultFormatBundle', class_names=class_names),
+    dict(type='CustomCollect', keys=['img', 'gt_masks_bev'])
 ]
 
 test_pipeline = [
@@ -81,10 +80,10 @@ test_pipeline = [
         flip=False,
         transforms=[
             dict(
-                type='DefaultFormatBundle3D',
+                type='DefaultFormatBundle',
                 class_names=class_names,
                 with_label=False),
-            dict(type='CustomCollect3D', keys=['img'])
+            dict(type='CustomCollect', keys=['img'])
         ])
 ]
 
@@ -98,13 +97,10 @@ data = dict(
         pipeline=train_pipeline,
         classes=class_names,
         modality=input_modality,
-        test_mode=False,
-        use_valid_flag=True,
         bev_size=(bev_h_, bev_w_),
         queue_length=queue_length,
-        # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
-        # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-        box_type_3d='LiDAR'),
+        test_mode=False,
+    ),
     val=dict(type=dataset_type,
              data_root=data_root,
             test_mode=False,
