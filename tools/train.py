@@ -7,6 +7,9 @@ from mmseg.models import build_model
 from mmseg.apis import set_random_seed, train_model
 from mmseg import __version__ as mmseg_version
 
+from mmsegBEV.apis import train_model
+from mmseg.datasets import build_dataset
+
 import utils
 
 def parse_args():
@@ -43,7 +46,7 @@ def main():
     meta['exp_name'] = os.path.basename(args.config)
     
     # init dataset
-    datasets = utils.initDataset(cfg)
+    datasets = [build_dataset(cfg.data.train), build_dataset(cfg.data.val)]
     
     # init model
     model = build_model(

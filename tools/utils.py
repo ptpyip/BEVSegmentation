@@ -6,10 +6,11 @@ import torch
 import mmcv
 from mmcv import Config
 from mmcv.runner import get_dist_info, init_dist
-from mmcv.utils import TORCH_VERSION, digit_version, get_logger
+from mmcv.utils import TORCH_VERSION, digit_version
 
 import mmseg
 from mmseg.datasets import build_dataset
+from mmsegBEV.utils import get_root_logger
    
 def initConfig(args):        
     cfg = Config.fromfile(args.config)
@@ -59,9 +60,7 @@ def initConfig(args):
 def initLogger(cfg, meta):    
     log_file = os.path.join(cfg.work_dir, f'{meta["timestamp"]}.log')
     
-    logger =  get_logger(
-        name='mmseg', log_file=log_file, log_level=cfg.log_level
-    )
+    logger =  get_root_logger(log_file=log_file, log_level=cfg.log_level)
        
     # log env info 
     env_info_dict = mmseg.utils.collect_env()
@@ -74,17 +73,17 @@ def initLogger(cfg, meta):
 
 def initDataset(cfg):
     datasets = [build_dataset(cfg.data.train)]
-    if len(cfg.workflow) == 2:
-        val_dataset = copy.deepcopy(cfg.data.val)
+    # if len(cfg.workflow) == 2:
+    #     val_dataset = copy.deepcopy(cfg.data.val)
         
-        # in case we use a dataset wrapper
-        if 'dataset' in cfg.data.train:
-            val_dataset.pipeline = cfg.data.train.dataset.pipeline
-        else:
-            val_dataset.pipeline = cfg.data.train.pipeline
+    #     # in case we use a dataset wrapper
+    #     if 'dataset' in cfg.data.train:
+    #         val_dataset.pipeline = cfg.data.train.dataset.pipeline
+    #     else:
+    #         val_dataset.pipeline = cfg.data.train.pipeline
             
-        # set test_mode=False here in deep copied config, which do not affect AP/AR calculation later
-        # refer to https://mmdetection3d.readthedocs.io/en/latest/tutorials/customize_runtime.html#customize-workflow  # noqa
-        val_dataset.test_mode = False
-        datasets.append(build_dataset(val_dataset)) 
+    #     # set test_mode=False here in deep copied config, which do not affect AP/AR calculation later
+    #     # refer to https://mmdetection3d.readthedocs.io/en/latest/tutorials/customize_runtime.html#customize-workflow  # noqa
+    #     val_dataset.test_mode = False
+    #     datasets.append(build_dataset(val_dataset)) 
     return datasets
