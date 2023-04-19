@@ -19,6 +19,8 @@ def parse_args():
         default='none',
         help='job launcher'
     )
+    
+    return parser.parse_args()
    
 def main():
     meta = {'timestamp': time.strftime('%Y%m%d_%H%M%S', time.localtime())}
