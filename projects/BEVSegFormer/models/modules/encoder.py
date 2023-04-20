@@ -5,8 +5,6 @@
 #  Modified by Zhiqi Li
 # ---------------------------------------------
 
-from projects.mmdet3d_plugin.models.utils.bricks import run_time
-from projects.mmdet3d_plugin.models.utils.visual import save_tensor
 from .custom_base_transformer_layer import MyCustomBaseTransformerLayer
 import copy
 import warnings

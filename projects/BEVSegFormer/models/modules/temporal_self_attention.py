@@ -4,14 +4,13 @@
 #  Modified by Zhiqi Li
 # ---------------------------------------------
 
-from projects.mmdet3d_plugin.models.utils.bricks import run_time
 from .multi_scale_deformable_attn_function import MultiScaleDeformableAttnFunction_fp32
 from mmcv.ops.multi_scale_deform_attn import multi_scale_deformable_attn_pytorch
 import warnings
 import torch
 import torch.nn as nn
 from mmcv.cnn import xavier_init, constant_init
-from mmcv.cnn.bricks.registry import ATTENTION
+
 import math
 from mmcv.runner.base_module import BaseModule, ModuleList, Sequential
 from mmcv.utils import (ConfigDict, build_from_cfg, deprecated_api_warning,
@@ -21,6 +20,7 @@ from mmcv.utils import ext_loader
 ext_module = ext_loader.load_ext(
     '_ext', ['ms_deform_attn_backward', 'ms_deform_attn_forward'])
 
+from mmsegBEV.models import ATTENTION
 
 @ATTENTION.register_module()
 class TemporalSelfAttention(BaseModule):

@@ -11,9 +11,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from mmcv.cnn import xavier_init, constant_init
-from mmcv.cnn.bricks.registry import (ATTENTION,
-                                      TRANSFORMER_LAYER,
-                                      TRANSFORMER_LAYER_SEQUENCE)
 from mmcv.cnn.bricks.transformer import build_attention
 import math
 from mmcv.runner import force_fp32, auto_fp16
@@ -23,7 +20,9 @@ from mmcv.runner.base_module import BaseModule, ModuleList, Sequential
 from mmcv.utils import ext_loader
 from .multi_scale_deformable_attn_function import MultiScaleDeformableAttnFunction_fp32, \
     MultiScaleDeformableAttnFunction_fp16
-from projects.mmdet3d_plugin.models.utils.bricks import run_time
+    
+from mmsegBEV.models import ATTENTION
+from ..bricks import run_time
 ext_module = ext_loader.load_ext(
     '_ext', ['ms_deform_attn_backward', 'ms_deform_attn_forward'])
 
