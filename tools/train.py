@@ -3,12 +3,12 @@ import time
 
 import argparse
 
-from mmseg.models import build_model
-from mmseg.apis import set_random_seed, train_model
+from mmsegBEV.models import build_model
+from mmsegBEV.apis import set_random_seed, train_model
 from mmseg import __version__ as mmseg_version
 
 from mmsegBEV.apis import train_model
-from mmseg.datasets import build_dataset
+from mmsegBEV.datasets import build_dataset
 
 import utils
 

@@ -9,7 +9,7 @@ from mmcv.runner import get_dist_info, init_dist
 from mmcv.utils import TORCH_VERSION, digit_version
 
 import mmseg
-from mmseg.datasets import build_dataset
+from mmsegBEV.datasets import build_dataset
 from mmsegBEV.utils import get_root_logger
    
 def initConfig(args):        
