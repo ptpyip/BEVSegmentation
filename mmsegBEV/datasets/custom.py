@@ -8,10 +8,10 @@ import numpy as np
 from mmcv.utils import print_log
 from prettytable import PrettyTable
 from torch.utils.data import Dataset
-from mmdet.datasets.pipelines import Compose
 
-from ..evaluation import eval_metrics, pre_eval_to_metrics
+from mmsegBEV.evaluation import eval_metrics, intersect_and_union, pre_eval_to_metrics
 from .builder import DATASETS
+from .pipelines import Compose
 
 @DATASETS.register_module()
 class CustomBEVDataset(Dataset):
@@ -93,7 +93,6 @@ class CustomBEVDataset(Dataset):
         self.test_mode = test_mode
         self.modality = modality
         self.filter_empty_gt = filter_empty_gt
-        self.label_map = None
 
         
         self.CLASSES, self.PALETTE = self.get_classes_and_palette(classes, palette)
@@ -222,52 +221,6 @@ class CustomBEVDataset(Dataset):
         example = self.pipeline(input_dict)
         return example
 
-        
-    def get_classes_and_palette(self, classes=None, palette=None):
-        """Get class names of current dataset.
-
-        Args:
-            classes (Sequence[str] | str | None): If classes is None, use
-                default CLASSES defined by builtin dataset. If classes is a
-                string, take it as a file name. The file contains the name of
-                classes where each line contains one class name. If classes is
-                a tuple or list, override the CLASSES defined by the dataset.
-            palette (Sequence[Sequence[int]]] | np.ndarray | None):
-                The palette of segmentation map. If None is given, random
-                palette will be generated. Default: None
-        """
-        if classes is None:
-            self.custom_classes = False
-            return self.CLASSES, self.PALETTE
-
-        self.custom_classes = True
-        if isinstance(classes, str):
-            # take it as a file path
-            class_names = mmcv.list_from_file(classes)
-        elif isinstance(classes, (tuple, list)):
-            class_names = classes
-        else:
-            raise ValueError(f'Unsupported type {type(classes)} of classes.')
-
-        # if self.CLASSES:
-        #     if not set(class_names).issubset(self.CLASSES):
-        #         raise ValueError('classes is not a subset of CLASSES.')
-
-        #     # dictionary, its keys are the old label ids and its values
-        #     # are the new label ids.
-        #     # used for changing pixel labels in load_annotations.
-        #     self.label_map = {}
-        #     for i, c in enumerate(self.CLASSES):
-        #         if c not in class_names:
-        #             self.label_map[i] = -1
-        #         else:
-        #             self.label_map[i] = class_names.index(c)
-        class_names = self.get_classes(classes)
-
-        palette = self.get_palette_for_custom_classes(class_names, palette)
-
-        return class_names, palette
-    
     @classmethod
     def get_classes(cls, classes=None):
         """Get class names of current dataset.
@@ -294,34 +247,6 @@ class CustomBEVDataset(Dataset):
             raise ValueError(f"Unsupported type {type(classes)} of classes.")
 
         return class_names
-    
-    def get_palette_for_custom_classes(self, class_names, palette=None):
-
-        if self.label_map is not None:
-            # return subset of palette
-            palette = []
-            for old_id, new_id in sorted(
-                    self.label_map.items(), key=lambda x: x[1]):
-                if new_id != -1:
-                    palette.append(self.PALETTE[old_id])
-            palette = type(self.PALETTE)(palette)
-
-        elif palette is None:
-            if self.PALETTE is None:
-                # Get random state before set seed, and restore
-                # random state later.
-                # It will prevent loss of randomness, as the palette
-                # may be different in each iteration if not specified.
-                # See: https://github.com/open-mmlab/mmdetection/issues/5844
-                state = np.random.get_state()
-                np.random.seed(42)
-                # random palette
-                palette = np.random.randint(0, 255, size=(len(class_names), 3))
-                np.random.set_state(state)
-            else:
-                palette = self.PALETTE
-
-        return palette
 
     def format_results(self, outputs, pklfile_prefix=None, submission_prefix=None):
         """Format the results to pkl file.

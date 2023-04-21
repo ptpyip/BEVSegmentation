@@ -1,2 +1,2 @@
-from .eval_hooks import DistEvalHook, EvalHook
+from .eval_hooks import CustomDistEvalHook
 from .metrics import *
