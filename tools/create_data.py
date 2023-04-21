@@ -2,7 +2,9 @@ from os import path
 import argparse
 
 from data_converter import nuscenes_converter as nuscenes_converter
-# from data_converter.create_gt_database import create_groundtruth_database
+from data_converter.create_gt_database import create_groundtruth_database
+
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Data converter arg parser")

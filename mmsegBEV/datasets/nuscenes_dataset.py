@@ -25,31 +25,6 @@ class NuScenesDataset(CustomBEVDataset):
         self.overlap_test = overlap_test
         self.bev_size = bev_size
         
-    # def pre_pipeline(self, results):
-    #    # maybe for future use
-    #     """Initialization before data preparation.
-
-    #     Args:
-    #         results (dict): Dict before data preprocessing.
-
-    #             - img_fields (list): Image fields.
-    #             - bbox3d_fields (list): 3D bounding boxes fields.
-    #             - pts_mask_fields (list): Mask fields of points.
-    #             - pts_seg_fields (list): Mask fields of point segments.
-    #             - bbox_fields (list): Fields of bounding boxes.
-    #             - mask_fields (list): Fields of masks.
-    #             - seg_fields (list): Segment fields.
-    #             - box_type_3d (str): 3D box type.
-    #             - box_mode_3d (str): 3D box mode.
-    #     """
-    #     results["img_fields"] = []
-    #     results["bbox3d_fields"] = []
-    #     results["pts_mask_fields"] = []
-    #     results["pts_seg_fields"] = []
-    #     results["bbox_fields"] = []
-    #     results["mask_fields"] = []
-    #     results["seg_fields"] = []
-        
     def prepare_train_data(self, index):
         """
         Training data preparation.
@@ -71,7 +46,7 @@ class NuScenesDataset(CustomBEVDataset):
             self.pre_pipeline(data)
             example = self.pipeline(data)
             if self.filter_empty_gt and \
-                    (example is None or ~(example['gt_labels_3d']._data != -1).any()):
+                    (example is None or ~(example.get("gt_labels_3d")._data != -1).any()):
                 return None
             queue.append(example)
         return self.union2one(queue)

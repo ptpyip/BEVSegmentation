@@ -178,10 +178,7 @@ lr_config = dict(
     warmup_ratio=1.0 / 3,
     min_lr_ratio=1e-3)
 total_epochs = 24
-
-# evaluation = dict(interval=1, pipeline={{_base_.test_pipeline}}, gpu_collect=False)
-
-evaluation = dict(interval=1, gpu_collect=False)
+evaluation = dict(interval=1, pipeline={{_base_.test_pipeline}})
 
 runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
 load_from = 'ckpts/r101_dcn_fcos3d_pretrain.pth'
