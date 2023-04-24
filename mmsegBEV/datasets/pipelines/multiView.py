@@ -7,6 +7,7 @@ import mmcv
 from mmcv.parallel import DataContainer as DC
 
 from ..builder import PIPELINES
+# from mmdet.datasets import PIPELINES
 
 @PIPELINES.register_module()
 class PadMultiViewImage(object):
@@ -239,3 +240,4 @@ class RandomScaleImageMultiViewImage(object):
         repr_str = self.__class__.__name__
         repr_str += f'(size={self.scales}, '
         return repr_str
+

@@ -85,6 +85,7 @@ class CustomBEVDataset(Dataset):
             test_mode=False,
             classes=None,
             palette=None,
+            load_interval=1,
             file_client_args=dict(backend='disk')
         ):
         super().__init__()
@@ -92,10 +93,13 @@ class CustomBEVDataset(Dataset):
         self.ann_file = ann_file
         self.test_mode = test_mode
         self.modality = modality
+        self.load_interval = load_interval
         self.filter_empty_gt = filter_empty_gt
 
-        
-        self.CLASSES, self.PALETTE = self.get_classes_and_palette(classes, palette)
+        # self.PALETTE = palette
+
+        # self.CLASSES, self.PALETTE = self.get_classes_and_palette(classes, palette)
+        self.CLASSES = classes
         self.cat2id = {name: i for i, name in enumerate(self.CLASSES)}
         self.data_infos = self.load_annotations(self.ann_file)
 
@@ -115,7 +119,7 @@ class CustomBEVDataset(Dataset):
 
     def __len__(self):
         """Total number of samples of data."""
-        return len(self.img_infos)
+        return len(self.data_infos)
     
     def __getitem__(self, idx):
         """Get item from infos according to the given index.
@@ -141,7 +145,12 @@ class CustomBEVDataset(Dataset):
         Returns:
             list[dict]: List of annotations.
         """
-        return mmcv.load(ann_file)
+        data = mmcv.load(ann_file)
+        data_infos = list(sorted(data['infos'], key=lambda e: e['timestamp']))
+        data_infos = data_infos[::self.load_interval]
+        self.metadata = data['metadata']
+        self.version = self.metadata['version']
+        return data_infos
 
     def get_data_info(self, index):
         """Get data info according to the given index.
@@ -196,6 +205,9 @@ class CustomBEVDataset(Dataset):
         Returns:
             dict: Training data dict of the corresponding index.
         """
+        print("************Prepare Training data Preparation in Custom3D*********")
+
+
         input_dict = self.get_data_info(index)
         if input_dict is None:
             return None
@@ -220,7 +232,54 @@ class CustomBEVDataset(Dataset):
         self.pre_pipeline(input_dict)
         example = self.pipeline(input_dict)
         return example
+    
+    def get_classes_and_palette(self, classes=None, palette=None):
+        """Get class names of current dataset.
 
+        Args:
+            classes (Sequence[str] | str | None): If classes is None, use
+                default CLASSES defined by builtin dataset. If classes is a
+                string, take it as a file name. The file contains the name of
+                classes where each line contains one class name. If classes is
+                a tuple or list, override the CLASSES defined by the dataset.
+            palette (Sequence[Sequence[int]]] | np.ndarray | None):
+                The palette of segmentation map. If None is given, random
+                palette will be generated. Default: None
+        """
+        print("get classes and palette")
+        if classes is None:
+            self.custom_classes = False
+            return self.CLASSES, self.PALETTE
+
+        self.custom_classes = True
+        if isinstance(classes, str):
+            # take it as a file path
+            class_names = mmcv.list_from_file(classes)
+        elif isinstance(classes, (tuple, list)):
+            class_names = classes
+        else:
+            raise ValueError(f'Unsupported type {type(classes)} of classes.')
+
+        if self.CLASSES:
+            if not set(class_names).issubset(self.CLASSES):
+                raise ValueError('classes is not a subset of CLASSES.')
+
+            # dictionary, its keys are the old label ids and its values
+            # are the new label ids.
+            # used for changing pixel labels in load_annotations.
+            self.label_map = {}
+            for i, c in enumerate(self.CLASSES):
+                if c not in class_names:
+                    self.label_map[i] = -1
+                else:
+                    self.label_map[i] = class_names.index(c)
+
+        class_names = self.get_classes(classes)
+
+        palette = self.get_palette_for_custom_classes(class_names, palette)
+        print("Before return!")
+        return class_names, palette
+    
     @classmethod
     def get_classes(cls, classes=None):
         """Get class names of current dataset.
@@ -247,7 +306,36 @@ class CustomBEVDataset(Dataset):
             raise ValueError(f"Unsupported type {type(classes)} of classes.")
 
         return class_names
-
+    
+    def get_palette_for_custom_classes(self, class_names, palette=None):
+        print("get_palette_for_custom_classes")
+        if self.label_map is not None:
+            print("label map!")
+            print(self.label_map)
+            # return subset of palette
+            print("self.palette: !")
+            print(self.PALETTE)
+            palette = []
+            for old_id, new_id in sorted(self.label_map.items(), key=lambda x: x[1]):
+                if new_id != -1:
+                    palette.append(self.PALETTE[old_id])
+            palette = type(self.PALETTE)(palette)
+        elif palette is None:
+            if self.PALETTE is None:
+                # Get random state before set seed, and restore
+                # random state later.
+                # It will prevent loss of randomness, as the palette
+                # may be different in each iteration if not specified.
+                # See: https://github.com/open-mmlab/mmdetection/issues/5844
+                state = np.random.get_state()
+                np.random.seed(42)
+                # random palette
+                palette = np.random.randint(0, 255, size=(len(class_names), 3))
+                np.random.set_state(state)
+            else:
+                palette = self.PALETTE
+        return palette
+    
     def format_results(self, outputs, pklfile_prefix=None, submission_prefix=None):
         """Format the results to pkl file.
 
@@ -421,7 +509,6 @@ class CustomBEVDataset(Dataset):
             })
 
         return eval_results
-
 
 def __extract_result_dict(results, key):
     """Extract and return the data corresponding to key in result dict.

@@ -3,10 +3,10 @@ import numpy as np
 from mmcv.parallel import DataContainer as DC
 
 from ..builder import PIPELINES
+# from mmdet.datasets import PIPELINES
 from mmdet.datasets.pipelines import to_tensor
 
 import torch
-
 
 @PIPELINES.register_module()
 class DefaultFormatBundle:
@@ -22,12 +22,10 @@ class DefaultFormatBundle:
 
     def __init__(
         self,
-        classes,
         with_gt: bool = True,
         with_label: bool = True,
     ) -> None:
         super().__init__()
-        self.class_names = classes
         self.with_gt = with_gt
         self.with_label = with_label
 
@@ -41,8 +39,15 @@ class DefaultFormatBundle:
             dict: The result dict contains the data that is formatted with
                 default bundle.
         """
-        if "img" in results:
-            results["img"] = DC(torch.stack(results["img"]), stack=True)
+        if 'img' in results:
+            if isinstance(results['img'], list):
+                # process multiple imgs in single frame
+                imgs = [img.transpose(2, 0, 1) for img in results['img']]
+                imgs = np.ascontiguousarray(np.stack(imgs, axis=0))
+                results['img'] = DC(to_tensor(imgs), stack=True)
+            else:
+                img = np.ascontiguousarray(results['img'].transpose(2, 0, 1))
+                results['img'] = DC(to_tensor(img), stack=True)
 
         return results
 
@@ -103,6 +108,7 @@ class Collect3D:
         for key in self.keys:
             if key not in self.meta_keys:
                 data[key] = results[key]
+        
         for key in self.meta_keys:
             if key in results:
                 val = np.array(results[key])
@@ -165,15 +171,16 @@ class CustomCollect3D(object):
 
     def __init__(self,
                  keys,
-                 meta_keys=('filename', 'ori_shape', 'img_shape', 'lidar2img',
+                 meta_keys=('filename', 'ori_shape', 'img_shape', 'lidar2image',
                             'depth2img', 'cam2img', 'pad_shape',
                             'scale_factor', 'flip', 'pcd_horizontal_flip',
-                            'pcd_vertical_flip', 'box_mode_3d', 'box_type_3d',
                             'img_norm_cfg', 'pcd_trans', 'sample_idx', 'prev_idx', 'next_idx',
                             'pcd_scale_factor', 'pcd_rotation', 'pts_filename',
                             'transformation_3d_flow', 'scene_token',
-                            'can_bus',
+                            'lidar_aug_matrix', 'lidar2ego', 'ego2global',
+                            'can_bus', 'camera_intrinsics'
                             )):
+
         self.keys = keys
         self.meta_keys = meta_keys
 
@@ -196,8 +203,16 @@ class CustomCollect3D(object):
                 img_metas[key] = results[key]
 
         data['img_metas'] = DC(img_metas, cpu_only=True)
+        
         for key in self.keys:
             data[key] = results[key]
+
+        # print("custom3ddata in formatting.py")
+        # for key in data.keys():
+        #     print(key)
+        
+        # print(f"is gt_masks_bev in data none? : {data['gt_masks_bev'] is None}")
+
         return data
 
     def __repr__(self):

@@ -10,8 +10,10 @@ from mmcv.utils import Registry, build_from_cfg
 
 from .samplers import build_sampler
 
-DATASETS = Registry('dataset')         
+DATASETS = Registry('datasets')         
+# from mmdet.datasets import DATASETS
 PIPELINES = Registry('pipeline')         
+
 
 def build_dataset(cfg, default_args=None):
     '''

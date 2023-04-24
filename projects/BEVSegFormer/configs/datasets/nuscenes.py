@@ -6,12 +6,13 @@ point_cloud_range = [-50, -50, -5, 50, 50, 3]
 
 # For nuScenes we usually do 10-class detection
 class_names = [
-    'drivable_area', 'ped_crossing', 'walkway', 'stop_line', 'carpark_area', 'divider'
+    'drivable_area', 'ped_crossing', 'walkway', 
+    'stop_line', 'carpark_area', 'divider'
 ]
 
-img_norm_cfg = dict(
-    mean=[103.530, 116.280, 123.675], std=[1.0, 1.0, 1.0], to_rgb=False
-)
+map_classes = ['drivable_area', 'ped_crossing', 
+               'walkway', 'stop_line',
+               'carpark_area', 'divider']
 
 input_modality = dict(
     use_lidar=False,
@@ -21,14 +22,28 @@ input_modality = dict(
     use_external=True)
 
 image_size = [256, 704]
-_dim_ = 256
-load_dim = use_dim = 5
-_pos_dim_ = _dim_//2
-_ffn_dim_ = _dim_*2
-_num_levels_ = 4
-bev_h_ = 200
-bev_w_ = 200
-queue_length = 4 # each sequence contains `queue_length` frames.
+bev_h_ = 50
+bev_w_ = 50
+queue_length = 2 # each sequence contains `queue_length` frames.
+
+# If point cloud range is changed, the models should also change their point
+# cloud range accordingly
+point_cloud_range = [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
+voxel_size = [0.2, 0.2, 8]
+
+# For nuScenes we usually do 10-class detection
+class_names = [
+    'car', 'truck', 'construction_vehicle', 'bus', 'trailer', 'barrier',
+    'motorcycle', 'bicycle', 'pedestrian', 'traffic_cone'
+]
+
+map_classes = ['drivable_area', 'ped_crossing', 
+               'walkway', 'stop_line',
+               'carpark_area', 'divider']
+
+img_norm_cfg = dict(
+    mean=[103.530, 116.280, 123.675], std=[1.0, 1.0, 1.0], to_rgb=False
+)
 
 
 augment2d = dict(
@@ -43,35 +58,43 @@ augment2d = dict(
 train_pipeline = [
     dict(type='LoadMultiViewImageFromFiles', to_float32=True),
     dict(type='PhotoMetricDistortionMultiViewImage'),
-    dict(type='LoadBEVSegmentation', 
-        rot_range=[-0.3925, 0.3925],
-        scale_ratio_range=[0.95, 1.05],
-        translation_std=[0, 0, 0]
+    dict(
+        type='GlobalRotScaleTrans', 
+        resize_lim=(1.0, 1.0), 
+        rot_lim=(0.0, 0.0), 
+        trans_lim=0.0, 
+        is_train=False
+    ),
+    dict(
+        type='LoadBEVSegmentation', 
+        dataset_root=data_root, 
+        xbound=[-50.0, 50.0, 0.5], 
+        ybound=[-50.0, 50.0, 0.5],
+        classes=map_classes,
     ),
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
-    # dict(
-    #     type='ImagAug', 
-    #     final_dim=image_size,
-    #     augment2d=augment2d,
-    #     resize_lim=load_dim,
-    #     bot_pct_lim=[0.0, 0.0],
-    #     rand_flip=True,
-    #     is_trian=True,
-    #     is_used=False
-    # ),
     dict(type='PadMultiViewImage', size_divisor=32),
-    dict(type='DefaultFormatBundle', class_names=class_names),
-    dict(type='CustomCollect', keys=['img', 'gt_masks_bev'])
+    dict(type='DefaultFormatBundle'),
+    dict(type='CustomCollect3D', keys=['img', 'gt_masks_bev'])
 ]
 
 test_pipeline = [
     dict(type='LoadMultiViewImageFromFiles', to_float32=True),
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
     dict(type='PadMultiViewImage', size_divisor=32),
-    dict(type='LoadBEVSegmentation', 
-        rot_range=[-0.3925, 0.3925],
-        scale_ratio_range=[0.95, 1.05],
-        translation_std=[0, 0, 0]
+    dict(
+        type='GlobalRotScaleTrans', 
+        resize_lim=(1.0, 1.0), 
+        rot_lim=(0.0, 0.0), 
+        trans_lim=0.0, 
+        is_train=False
+    ),
+    dict(
+        type='LoadBEVSegmentation', 
+        dataset_root=data_root, 
+        xbound=[-50.0, 50.0, 0.5], 
+        ybound=[-50.0, 50.0, 0.5],
+        classes=map_classes
     ),
     dict(
         type='MultiScaleFlipAug3D',
@@ -79,13 +102,24 @@ test_pipeline = [
         pts_scale_ratio=1,
         flip=False,
         transforms=[
-            dict(
-                type='DefaultFormatBundle',
-                class_names=class_names,
-                with_label=False),
-            dict(type='CustomCollect', keys=['img'])
-        ])
+                dict(type='DefaultFormatBundle',with_label=False),
+                dict(type='CustomCollect3D', keys=['img'])]
+        ),
 ]
+
+MAP_PALETTE = {
+    "drivable_area": (166, 206, 227),
+    "road_segment": (31, 120, 180),
+    "road_block": (178, 223, 138),
+    "lane": (51, 160, 44),
+    "ped_crossing": (251, 154, 153),
+    "walkway": (227, 26, 28),
+    "stop_line": (253, 191, 111),
+    "carpark_area": (255, 127, 0),
+    "road_divider": (202, 178, 214),
+    "lane_divider": (106, 61, 154),
+    "divider": (106, 61, 154),
+}
 
 data = dict(
     samples_per_gpu=1,
@@ -93,23 +127,30 @@ data = dict(
     train=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'nuscenes_infos_temporal_train.pkl',
+        ann_file='data/nuscenes_infos_temporal_train.pkl',
         pipeline=train_pipeline,
         classes=class_names,
+        palette=MAP_PALETTE,
         modality=input_modality,
         bev_size=(bev_h_, bev_w_),
         queue_length=queue_length,
         test_mode=False,
     ),
-    val=dict(type=dataset_type,
-             data_root=data_root,
-            test_mode=False,
-             ann_file=data_root + 'nuscenes_infos_temporal_val.pkl',
-             pipeline=test_pipeline,  bev_size=(bev_h_, bev_w_),
-             classes=class_names, modality=input_modality, samples_per_gpu=1),
-    test=dict(type=dataset_type,
-              data_root=data_root,
-              ann_file=data_root + 'nuscenes_infos_temporal_val.pkl',
+    val=dict(
+        type=dataset_type,
+        data_root=data_root,
+        test_mode=False,
+        ann_file='data/nuscenes_infos_temporal_val.pkl',
+        pipeline=test_pipeline,  
+        bev_size=(bev_h_, bev_w_),
+        classes=class_names, 
+        modality=input_modality, 
+        # samples_per_gpu=1
+    ),
+    test=dict(
+        type=dataset_type,
+        data_root=data_root,
+        ann_file=data_root + 'nuscenes_infos_temporal_val.pkl',
               pipeline=test_pipeline, bev_size=(bev_h_, bev_w_),
               classes=class_names, modality=input_modality),
     shuffle=True,
