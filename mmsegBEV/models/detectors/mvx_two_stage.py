@@ -29,7 +29,6 @@ class MVXTwoStageDetector(Base3DDetector):
                  pts_backbone=None,
                  img_neck=None,
                  pts_neck=None,
-                 seg_head=None,
                  img_roi_head=None,
                  img_rpn_head=None,
                  train_cfg=None,

@@ -171,7 +171,7 @@ class PerceptionTransformer(BaseModule):
             spatial_shape = (h, w)
             feat = feat.flatten(3).permute(1, 0, 3, 2)
             if self.use_cams_embeds:
-                feat = feat + self.cams_embeds[0:3, None, None, :].to(feat.dtype)
+                feat = feat + self.cams_embeds[:, None, None, :].to(feat.dtype)
             feat = feat + self.level_embeds[None,
                                             None, lvl:lvl + 1, :].to(feat.dtype)
             spatial_shapes.append(spatial_shape)

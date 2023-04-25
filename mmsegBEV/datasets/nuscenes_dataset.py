@@ -79,6 +79,7 @@ class NuScenesDataset(CustomBEVDataset):
         return self.union2one(queue)
 
     def union2one(self, queue):
+        # print("Union to one")
         imgs_list = [each['img'].data for each in queue]
         metas_map = {}
         prev_scene_token = None
@@ -104,6 +105,10 @@ class NuScenesDataset(CustomBEVDataset):
         queue[-1]['img'] = DataContainer(torch.stack(imgs_list), cpu_only=False, stack=True)
         queue[-1]['img_metas'] = DataContainer(metas_map, cpu_only=True)
         queue = queue[-1]
+
+        # for key in queue.keys():
+        #     print(key)
+
         return queue
 
     def get_data_info(self, index):

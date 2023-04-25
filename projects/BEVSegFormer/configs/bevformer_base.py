@@ -14,9 +14,9 @@ _dim_ = 256
 _pos_dim_ = _dim_//2
 _ffn_dim_ = _dim_*2
 _num_levels_ = 4
-bev_h_ = 50
-bev_w_ = 50
-queue_length = 2 # each sequence contains `queue_length` frames.
+bev_h_ = 200
+bev_w_ = 200
+queue_length = 3 # each sequence contains `queue_length` frames.
 
 point_cloud_range = [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
 voxel_size = [0.2, 0.2, 8]
@@ -36,7 +36,7 @@ model = dict(
         style='pytorch',
         dcn=dict(type='DCNv2', deform_groups=1, fallback_on_stride=False), # original DCNv2 will print log when perform load_state_dict
         stage_with_dcn=(False, False, True, True),
-        init_cfg = dict(type='Pretrained', checkpoint='ckpts/resnet101-5d3b4d8f.pth'),
+        # init_cfg = dict(type='Pretrained', checkpoint='ckpts/resnet101-5d3b4d8f.pth'),
     ),
     img_neck=dict(
         type='FPN',

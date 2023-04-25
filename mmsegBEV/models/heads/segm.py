@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import torch
 from torch import nn
 from torch.nn import functional as F
+from torch.nn.functional import interpolate
 
 from ..builder import HEADS, build_transformer
 from mmcv.cnn.bricks.transformer import build_positional_encoding
@@ -29,6 +30,7 @@ def sigmoid_focal_loss(
 ) -> torch.Tensor:
     inputs = inputs.float()
     targets = targets.float()
+    # targets = interpolate(targets, size=(50, 50))
     p = torch.sigmoid(inputs)
     ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
     p_t = p * targets + (1 - p) * (1 - targets)
@@ -143,13 +145,15 @@ class BEVSegmentationHead(nn.Module):
                                 device=bev_queries.device).to(dtype)
         bev_pos = self.positional_encoding(bev_mask).to(dtype)
 
-        x = self.transformer.get_bev_features(mlvl_feats=x, 
-                                              bev_queries=bev_queries,
-                                              object_query_embed=object_query_embeds, 
-                                              bev_h=self.bev_h, bev_w=self.bev_w,
-                                              bev_pos=bev_pos,
-                                              prev_bev=prev_bev,
-                                              img_metas=img_metas)
+        # x = self.transformer.get_bev_features(mlvl_feats=x, 
+        #                                       bev_queries=bev_queries,
+        #                                       object_query_embed=object_query_embeds, 
+        #                                       bev_h=self.bev_h, bev_w=self.bev_w,
+        #                                       bev_pos=bev_pos,
+        #                                       prev_bev=prev_bev,
+        #                                       img_metas=img_metas)
+
+        
 
         if target is None:
             return x
@@ -160,9 +164,8 @@ class BEVSegmentationHead(nn.Module):
 
         losses = dict()
         losses['loss'] = sigmoid_focal_loss(x, target)
-        
-        print("losses from segm.py")
-        print(type(losses))
+
+        # loss = sigmoid_focal_loss(x, target)
 
         return losses
 

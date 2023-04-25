@@ -43,7 +43,7 @@ class SpatialCrossAttention(BaseModule):
 
     def __init__(self,
                  embed_dims=256,
-                 num_cams= 3, #6,
+                 num_cams= 6,
                  pc_range=None,
                  dropout=0.1,
                  init_cfg=None,

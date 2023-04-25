@@ -59,7 +59,8 @@ class BEVFormer(MVXTwoStageDetector):
         if seg_head:
             self.seg_head = build_head(seg_head)
         if not seg_head:
-            print("no seg head in mvx two stage")
+            print("no seg head")
+            assert True
 
         # temporal
         self.video_test_mode = video_test_mode
@@ -88,8 +89,7 @@ class BEVFormer(MVXTwoStageDetector):
             if self.use_grid_mask:
                 img = self.grid_mask(img)
 
-            img_test = img[0:3, :, :, :]
-            img_test = interpolate(img_test, size=(256, 704))
+            img_test = interpolate(img, size=(256, 256))
             img_feats = self.img_backbone(img_test)
             if isinstance(img_feats, dict):
                 img_feats = list(img_feats.values())
@@ -174,8 +174,8 @@ class BEVFormer(MVXTwoStageDetector):
         Returns:
             dict: Losses of different branches.
         """
-        print("Forward train from bevformer.py")
-        print(gt_masks_bev)
+        print("****Forward train from /data/ddoo/projects/bevseg/BEVSegmentation/mmsegBEV/models/detectors/bevformer.py****")
+        print(gt_masks_bev.shape)
         len_queue = img.size(1)
         prev_img = img[:, :-1, ...]
         img = img[:, -1, ...]
@@ -193,7 +193,10 @@ class BEVFormer(MVXTwoStageDetector):
 
         for name, val in losses.items():
             outputs[f"loss/{name}"] = val
-
+        
+        print("****losses from /data/ddoo/projects/bevseg/BEVSegmentation/mmsegBEV/models/detectors/bevformer.py****")
+        print(outputs)
+        
         return outputs
 
     def forward_test(self, img_metas, img=None, **kwargs):
