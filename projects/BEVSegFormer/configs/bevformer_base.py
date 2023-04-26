@@ -36,7 +36,7 @@ model = dict(
         style='pytorch',
         dcn=dict(type='DCNv2', deform_groups=1, fallback_on_stride=False), # original DCNv2 will print log when perform load_state_dict
         stage_with_dcn=(False, False, True, True),
-        # init_cfg = dict(type='Pretrained', checkpoint='ckpts/resnet101-5d3b4d8f.pth'),
+        init_cfg = dict(type='Pretrained', checkpoint='ckpts/resnet101-5d3b4d8f.pth'),
     ),
     img_neck=dict(
         type='FPN',
@@ -74,14 +74,15 @@ model = dict(
                             type='TemporalSelfAttention',
                             embed_dims=256,
                             num_levels=1
-                            ),
+                        ),
                         dict(
                             type='SpatialCrossAttention',
                             pc_range=[-51.2, -51.2, -5.0, 51.2, 51.2, 3.0],
-                            deformable_attention=dict( type='MSDeformableAttention3D', 
-                                                        embed_dims=256, num_points=8, num_levels=4),
+                            deformable_attention=dict( 
+                                        type='MSDeformableAttention3D', 
+                                        embed_dims=256, num_points=8, num_levels=4),
                             embed_dims=256
-                            )
+                        )
                     ],
                     feedforward_channels=512,
                     ffn_dropout=0.1,
@@ -89,29 +90,29 @@ model = dict(
                                      'ffn', 'norm')
                 )
             ),
-            decoder=dict(
-                type='DetectionTransformerDecoder',
-                num_layers=6,
-                return_intermediate=True,
-                transformerlayers=dict(
-                    type='DetrTransformerDecoderLayer',
-                    attn_cfgs=[
-                        dict(
-                            type='MultiheadAttention',
-                            embed_dims=_dim_,
-                            num_heads=8,
-                            dropout=0.1),
-                         dict(
-                            type='CustomMSDeformableAttention',
-                            embed_dims=_dim_,
-                            num_levels=1),
-                    ],
+            # decoder=dict(
+            #     type='DetectionTransformerDecoder',
+            #     num_layers=6,
+            #     return_intermediate=True,
+            #     transformerlayers=dict(
+            #         type='DetrTransformerDecoderLayer',
+            #         attn_cfgs=[
+            #             dict(
+            #                 type='MultiheadAttention',
+            #                 embed_dims=_dim_,
+            #                 num_heads=8,
+            #                 dropout=0.1),
+            #              dict(
+            #                 type='CustomMSDeformableAttention',
+            #                 embed_dims=_dim_,
+            #                 num_levels=1),
+            #         ],
 
-                    feedforward_channels=_ffn_dim_,
-                    ffn_dropout=0.1,
-                    operation_order=('self_attn', 'norm', 'cross_attn', 'norm',
-                                     'ffn', 'norm'))
-            )
+            #         feedforward_channels=_ffn_dim_,
+            #         ffn_dropout=0.1,
+            #         operation_order=('self_attn', 'norm', 'cross_attn', 'norm',
+            #                          'ffn', 'norm'))
+            # )
         ),
         positional_encoding=dict(
             type='SinePositionalEncoding',
@@ -133,18 +134,18 @@ model = dict(
     ),
     # model training and testing settings
     train_cfg=dict(
-        pts=dict(
-            grid_size=[512, 512, 1],
-            voxel_size=voxel_size,
-            point_cloud_range=point_cloud_range,
-            out_size_factor=4,
-            assigner=dict(
-                type='HungarianAssigner3D',
-                cls_cost=dict(type='FocalLossCost', weight=2.0),
-                reg_cost=dict(type='BBox3DL1Cost', weight=0.25),
-                iou_cost=dict(type='IoUCost', weight=0.0), # Fake cost. This is just to make it compatible with DETR head.
-                pc_range=point_cloud_range)
-        )
+        # pts=dict(
+        #     grid_size=[512, 512, 1],
+        #     voxel_size=voxel_size,
+        #     point_cloud_range=point_cloud_range,
+        #     out_size_factor=4,
+        #     assigner=dict(
+        #         type='HungarianAssigner3D',
+        #         cls_cost=dict(type='FocalLossCost', weight=2.0),
+        #         reg_cost=dict(type='BBox3DL1Cost', weight=0.25),
+        #         iou_cost=dict(type='IoUCost', weight=0.0), # Fake cost. This is just to make it compatible with DETR head.
+        #         pc_range=point_cloud_range)
+        # )
     )
 )
 
