@@ -169,23 +169,23 @@ def registerValHooks(runner, dataloader_val, cfg, distributed=False):
     eval_hook = CustomDistEvalHook if distributed else EvalHook
     runner.register_hook(eval_hook(dataloader_val, **eval_cfg))
 
-def train_model(model,
-                dataset,
-                cfg,
-                distributed=False,
-                validate=False,
-                timestamp=None,
-                meta=None):
-    """A function wrapper for launching model training according to cfg.
+# def train_model(model,
+#                 dataset,
+#                 cfg,
+#                 distributed=False,
+#                 validate=False,
+#                 timestamp=None,
+#                 meta=None):
+#     """A function wrapper for launching model training according to cfg.
 
-    Because we need different eval_hook in runner. Should be deprecated in the
-    future.
-    """
-    train_segmentor(
-        model,
-        dataset,
-        cfg,
-        distributed=distributed,
-        validate=validate,
-        timestamp=timestamp,
-        meta=meta)
+#     Because we need different eval_hook in runner. Should be deprecated in the
+#     future.
+#     """
+#     train_segmentor(
+#         model,
+#         dataset,
+#         cfg,
+#         distributed=distributed,
+#         validate=validate,
+#         timestamp=timestamp,
+#         meta=meta)
