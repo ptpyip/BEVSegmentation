@@ -62,51 +62,47 @@ class MVBEVSegFormer(EncoderDecoder):
         """Initialize ``decode_head`` in EncoderDecoder"""
         self.decode_head = build_head(decode_head)
 
-
-    def extract_img_feat(self, img, img_metas, len_queue=None):
-        """Extract features of images."""
-        B = img.size(0)
-        if img is not None:
-            
-            # input_shape = img.shape[-2:]
-            # # update real input shape of each single img
-            # for img_meta in img_metas:
-            #     img_meta.update(input_shape=input_shape)
-
-            if img.dim() == 5 and img.size(0) == 1:
-                img.squeeze_()
-            elif img.dim() == 5 and img.size(0) > 1:
-                B, N, C, H, W = img.size()
-                img = img.reshape(B * N, C, H, W)
-            if self.use_grid_mask:
-                img = self.grid_mask(img)
-
-            img_feats = self.img_backbone(img)
-            if isinstance(img_feats, dict):
-                img_feats = list(img_feats.values())
-        else:
-            return None
-        if self.with_img_neck:
-            img_feats = self.img_neck(img_feats)
-
-        img_feats_reshaped = []
-        for img_feat in img_feats:
-            BN, C, H, W = img_feat.size()
-            if len_queue is not None:
-                img_feats_reshaped.append(img_feat.view(int(B/len_queue), len_queue, int(BN / B), C, H, W))
-            else:
-                img_feats_reshaped.append(img_feat.view(B, int(BN / B), C, H, W))
-        return img_feats_reshaped
-
     @auto_fp16(apply_to=('img'))
     def extract_feat(self, img, img_metas=None, len_queue=None):
         """Extract features from images and points."""
-
-        img_feats = self.extract_img_feat(img, img_metas, len_queue=len_queue)
+        if img is None: return None
+        batch_size = img.size(0)
         
-        return img_feats
+        img = self.preprocess_img(img)
+        img_feats = self.backbone(img)
+        if isinstance(img_feats, dict):
+            img_feats = list(img_feats.values())
+        
+        if self.with_neck:
+            img_feats = self.neck(img_feats)
+        
+        return self.reshape_img_feats(img_feats, batch_size, len_queue=len_queue)
+        
+    def preprocess_img(self, img):
+        if img.dim() == 5 and img.size(0) == 1:
+            img.squeeze_()
+        elif img.dim() == 5 and img.size(0) > 1:
+            B, N, C, H, W = img.size()
+            img = img.reshape(B * N, C, H, W)
+            
+        if self.use_grid_mask:
+            img = self.grid_mask(img)
 
+        return img
 
+    def reshape_img_feats(self, img_feats, batch_size, len_queue=None):
+        """Reshape features of images."""
+        img_feats_reshaped = []
+        for img_feat in img_feats:
+            BN, C, H, W = img_feat.size()
+            
+            if len_queue is not None:
+                img_feats_reshaped.append(img_feat.view(int(batch_size/len_queue), len_queue, int(BN / batch_size), C, H, W))
+            else:
+                img_feats_reshaped.append(img_feat.view(batch_size, int(BN / batch_size), C, H, W))
+                
+        return img_feats_reshaped
+      
     def forward_pts_train(self,
                           pts_feats,
                           gt_bboxes_3d,
@@ -271,13 +267,13 @@ class MVBEVSegFormer(EncoderDecoder):
         """Test function"""
         outs = self.pts_bbox_head(x, img_metas, prev_bev=prev_bev)
 
-        bbox_list = self.pts_bbox_head.get_bboxes(
-            outs, img_metas, rescale=rescale)
-        bbox_results = [
-            bbox3d2result(bboxes, scores, labels)
-            for bboxes, scores, labels in bbox_list
-        ]
-        return outs['bev_embed'], bbox_results
+        # bbox_list = self.pts_bbox_head.get_bboxes(
+        #     outs, img_metas, rescale=rescale)
+        # bbox_results = [
+        #     bbox3d2result(bboxes, scores, labels)
+        #     for bboxes, scores, labels in bbox_list
+        # ]
+        # return outs['bev_embed'], bbox_results
 
     def simple_test(self, img_metas, img=None, prev_bev=None, rescale=False):
         """Test function without augmentaiton."""
