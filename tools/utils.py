@@ -5,6 +5,7 @@ import torch
 
 import mmcv
 from mmcv import Config
+from mmcv.utils import import_modules_from_strings
 from mmcv.runner import get_dist_info, init_dist
 from mmcv.utils import TORCH_VERSION, digit_version
 
@@ -17,7 +18,6 @@ def initConfig(args):
         
     ### import modules from string list.
     if cfg.get('custom_imports', None):
-        from mmcv.utils import import_modules_from_strings
         import_modules_from_strings(**cfg['custom_imports'])
         
     ### set work_dir (priority: CLI > segment in file > filename)
