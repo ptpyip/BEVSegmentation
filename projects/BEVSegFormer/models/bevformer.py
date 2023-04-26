@@ -6,19 +6,17 @@
 
 import torch
 from mmcv.runner import force_fp32, auto_fp16
-from mmdet3d.core import bbox3d2result
-from mmdet3d.models.detectors.mvx_two_stage import MVXTwoStageDetector
 import time
 import copy
 import numpy as np
 
 from mmsegBEV.models import SEGMENTORS
-
+from mmsegBEV.models.segmentors import EncoderDecoder
 from bricks import run_time
 from grid_mask import GridMask
 
 @SEGMENTORS.register_module()
-class BEVFormer(MVXTwoStageDetector):
+class BEVFormer(EncoderDecoder):
     """BEVFormer.
     Args:
         video_test_mode (bool): Decide whether to use temporal information during inference.
@@ -26,17 +24,8 @@ class BEVFormer(MVXTwoStageDetector):
 
     def __init__(self,
                  use_grid_mask=False,
-                 pts_voxel_layer=None,
-                 pts_voxel_encoder=None,
-                 pts_middle_encoder=None,
-                 pts_fusion_layer=None,
                  img_backbone=None,
-                 pts_backbone=None,
                  img_neck=None,
-                 pts_neck=None,
-                 pts_bbox_head=None,
-                 img_roi_head=None,
-                 img_rpn_head=None,
                  train_cfg=None,
                  test_cfg=None,
                  pretrained=None,
