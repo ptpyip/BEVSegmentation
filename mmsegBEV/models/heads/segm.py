@@ -76,7 +76,7 @@ class BEVGridTransform(nn.Module):
             v = torch.arange(omin + ostep / 2, omax, ostep)
             v = (v - imin) / (imax - imin) * 2 - 1
             coords.append(v.to(x.device))
-
+        
         u, v = torch.meshgrid(coords, indexing="ij")
         grid = torch.stack([v, u], dim=-1)
         grid = torch.stack([grid] * x.shape[0], dim=0)
@@ -145,30 +145,38 @@ class BEVSegmentationHead(nn.Module):
                                 device=bev_queries.device).to(dtype)
         bev_pos = self.positional_encoding(bev_mask).to(dtype)
 
-        # x = self.transformer.get_bev_features(mlvl_feats=x, 
-        #                                       bev_queries=bev_queries,
-        #                                       object_query_embed=object_query_embeds, 
-        #                                       bev_h=self.bev_h, bev_w=self.bev_w,
-        #                                       bev_pos=bev_pos,
-        #                                       prev_bev=prev_bev,
-        #                                       img_metas=img_metas)
+        x = self.transformer.get_bev_features(mlvl_feats=x, 
+                                              bev_queries=bev_queries,
+                                              object_query_embed=object_query_embeds, 
+                                              bev_h=self.bev_h, bev_w=self.bev_w,
+                                              bev_pos=bev_pos,
+                                              prev_bev=prev_bev,
+                                              img_metas=img_metas)
 
         
 
         if target is None:
             return x
 
-        x = torch.reshape(x, (1, self.bev_h, self.bev_w, -1))  #(BS, h, w, dim)
-        x = torch.permute(x, (0, 3, 1, 2)) # (BS, dim, h, w)
+        print(f"x : {len(x)}")
+        print(f"x[0] : {x[0].shape}")
+
+        # (1, 200*200, 256)
+        x = torch.reshape(x, (1, self.bev_h, self.bev_w, -1))  #(BS, h, w, dim) = (1, 200, 200, 256)
+        x = torch.permute(x, (0, 3, 1, 2)) # (BS, dim, h, w) = (1, 256, 200, 200)
+
+        print(f"x : {x.shape}")
+
+        x = self.transform(x)
         x = self.classifier(x)
+
+        print("From /data/ddoo/projects/bevseg/BEVSegmentation/mmsegBEV/models/heads/segm.py, line 173: ")
+        print(x.shape)
 
         losses = dict()
         losses['loss'] = sigmoid_focal_loss(x, target)
 
-        # loss = sigmoid_focal_loss(x, target)
-
         return losses
-
     """
         def forward(
             self,

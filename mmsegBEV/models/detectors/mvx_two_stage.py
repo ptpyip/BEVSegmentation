@@ -7,9 +7,9 @@ from mmcv.runner import force_fp32
 from os import path as osp
 from torch.nn import functional as F
 
-from mmsegBEV.core import (Box3DMode, Coord3DMode, bbox3d2result,
-                          merge_aug_bboxes_3d, show_result)
-from mmsegBEV.ops import Voxelization
+# from mmsegBEV.core import (Box3DMode, Coord3DMode, bbox3d2result,
+#                           merge_aug_bboxes_3d, show_result)
+# from mmsegBEV.ops import Voxelization
 from mmdet.core import multi_apply
 from mmdet.models import DETECTORS
 from .. import builder
@@ -21,46 +21,48 @@ class MVXTwoStageDetector(Base3DDetector):
     """Base class of Multi-modality VoxelNet."""
 
     def __init__(self,
-                 pts_voxel_layer=None,
-                 pts_voxel_encoder=None,
-                 pts_middle_encoder=None,
-                 pts_fusion_layer=None,
+                #  pts_voxel_layer=None,
+                #  pts_voxel_encoder=None,
+                #  pts_middle_encoder=None,
+                #  pts_fusion_layer=None,
                  img_backbone=None,
-                 pts_backbone=None,
+                #  pts_backbone=None,
                  img_neck=None,
-                 pts_neck=None,
-                 img_roi_head=None,
-                 img_rpn_head=None,
+                #  pts_neck=None,
+                #  img_roi_head=None,
+                #  img_rpn_head=None,
                  train_cfg=None,
                  test_cfg=None,
                  pretrained=None,
                  init_cfg=None):
         super(MVXTwoStageDetector, self).__init__(init_cfg=init_cfg)
 
-        if pts_voxel_layer:
-            self.pts_voxel_layer = Voxelization(**pts_voxel_layer)
-        if pts_voxel_encoder:
-            self.pts_voxel_encoder = builder.build_voxel_encoder(
-                pts_voxel_encoder)
-        if pts_middle_encoder:
-            self.pts_middle_encoder = builder.build_middle_encoder(
-                pts_middle_encoder)
-        if pts_backbone:
-            self.pts_backbone = builder.build_backbone(pts_backbone)
-        if pts_fusion_layer:
-            self.pts_fusion_layer = builder.build_fusion_layer(
-                pts_fusion_layer)
-        if pts_neck is not None:
-            self.pts_neck = builder.build_neck(pts_neck)
+        # if pts_voxel_layer:
+        #     self.pts_voxel_layer = Voxelization(**pts_voxel_layer)
+        # if pts_voxel_encoder:
+        #     self.pts_voxel_encoder = builder.build_voxel_encoder(
+        #         pts_voxel_encoder)
+        # if pts_middle_encoder:
+        #     self.pts_middle_encoder = builder.build_middle_encoder(
+        #         pts_middle_encoder)
+        # if pts_backbone:
+        #     self.pts_backbone = builder.build_backbone(pts_backbone)
+        # if pts_fusion_layer:
+        #     self.pts_fusion_layer = builder.build_fusion_layer(
+        #         pts_fusion_layer)
+        # if pts_neck is not None:
+        #     self.pts_neck = builder.build_neck(pts_neck)
 
         if img_backbone:
             self.img_backbone = builder.build_backbone(img_backbone)
         if img_neck is not None:
             self.img_neck = builder.build_neck(img_neck)
-        if img_rpn_head is not None:
-            self.img_rpn_head = builder.build_head(img_rpn_head)
-        if img_roi_head is not None:
-            self.img_roi_head = builder.build_head(img_roi_head)
+        # if img_rpn_head is not None:
+        #     self.img_rpn_head = builder.build_head(img_rpn_head)
+        # if img_roi_head is not None:
+        #     print("From /data/ddoo/projects/bevseg/BEVSegmentation/mmsegBEV/models/detectors/mvx_two_stage.py, line 63:")
+        #     print("img_roi_head is not none?")
+        #     self.img_roi_head = builder.build_head(img_roi_head)
 
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
@@ -381,16 +383,16 @@ class MVXTwoStageDetector(Base3DDetector):
         proposal_list = self.img_rpn_head.get_bboxes(*proposal_inputs)
         return proposal_list
 
-    def simple_test_pts(self, x, img_metas, rescale=False):
-        """Test function of point cloud branch."""
-        outs = self.pts_bbox_head(x)
-        bbox_list = self.pts_bbox_head.get_bboxes(
-            *outs, img_metas, rescale=rescale)
-        bbox_results = [
-            bbox3d2result(bboxes, scores, labels)
-            for bboxes, scores, labels in bbox_list
-        ]
-        return bbox_results
+    # def simple_test_pts(self, x, img_metas, rescale=False):
+    #     """Test function of point cloud branch."""
+    #     outs = self.pts_bbox_head(x)
+    #     bbox_list = self.pts_bbox_head.get_bboxes(
+    #         *outs, img_metas, rescale=rescale)
+    #     bbox_results = [
+    #         bbox3d2result(bboxes, scores, labels)
+    #         for bboxes, scores, labels in bbox_list
+    #     ]
+    #     return bbox_results
 
     def simple_test(self, points, img_metas, img=None, rescale=False):
         """Test function without augmentaiton."""
@@ -428,69 +430,69 @@ class MVXTwoStageDetector(Base3DDetector):
                                            img_metas)
         return img_feats, pts_feats
 
-    def aug_test_pts(self, feats, img_metas, rescale=False):
-        """Test function of point cloud branch with augmentaiton."""
-        # only support aug_test for one sample
-        aug_bboxes = []
-        for x, img_meta in zip(feats, img_metas):
-            outs = self.pts_bbox_head(x)
-            bbox_list = self.pts_bbox_head.get_bboxes(
-                *outs, img_meta, rescale=rescale)
-            bbox_list = [
-                dict(boxes_3d=bboxes, scores_3d=scores, labels_3d=labels)
-                for bboxes, scores, labels in bbox_list
-            ]
-            aug_bboxes.append(bbox_list[0])
+    # def aug_test_pts(self, feats, img_metas, rescale=False):
+    #     """Test function of point cloud branch with augmentaiton."""
+    #     # only support aug_test for one sample
+    #     aug_bboxes = []
+    #     for x, img_meta in zip(feats, img_metas):
+    #         outs = self.pts_bbox_head(x)
+    #         bbox_list = self.pts_bbox_head.get_bboxes(
+    #             *outs, img_meta, rescale=rescale)
+    #         bbox_list = [
+    #             dict(boxes_3d=bboxes, scores_3d=scores, labels_3d=labels)
+    #             for bboxes, scores, labels in bbox_list
+    #         ]
+    #         aug_bboxes.append(bbox_list[0])
 
-        # after merging, bboxes will be rescaled to the original image size
-        merged_bboxes = merge_aug_bboxes_3d(aug_bboxes, img_metas,
-                                            self.pts_bbox_head.test_cfg)
-        return merged_bboxes
+    #     # after merging, bboxes will be rescaled to the original image size
+    #     merged_bboxes = merge_aug_bboxes_3d(aug_bboxes, img_metas,
+    #                                         self.pts_bbox_head.test_cfg)
+    #     return merged_bboxes
 
-    def show_results(self, data, result, out_dir):
-        """Results visualization.
+    # def show_results(self, data, result, out_dir):
+    #     """Results visualization.
 
-        Args:
-            data (dict): Input points and the information of the sample.
-            result (dict): Prediction results.
-            out_dir (str): Output directory of visualization result.
-        """
-        for batch_id in range(len(result)):
-            if isinstance(data['points'][0], DC):
-                points = data['points'][0]._data[0][batch_id].numpy()
-            elif mmcv.is_list_of(data['points'][0], torch.Tensor):
-                points = data['points'][0][batch_id]
-            else:
-                ValueError(f"Unsupported data type {type(data['points'][0])} "
-                           f'for visualization!')
-            if isinstance(data['img_metas'][0], DC):
-                pts_filename = data['img_metas'][0]._data[0][batch_id][
-                    'pts_filename']
-                box_mode_3d = data['img_metas'][0]._data[0][batch_id][
-                    'box_mode_3d']
-            elif mmcv.is_list_of(data['img_metas'][0], dict):
-                pts_filename = data['img_metas'][0][batch_id]['pts_filename']
-                box_mode_3d = data['img_metas'][0][batch_id]['box_mode_3d']
-            else:
-                ValueError(
-                    f"Unsupported data type {type(data['img_metas'][0])} "
-                    f'for visualization!')
-            file_name = osp.split(pts_filename)[-1].split('.')[0]
+    #     Args:
+    #         data (dict): Input points and the information of the sample.
+    #         result (dict): Prediction results.
+    #         out_dir (str): Output directory of visualization result.
+    #     """
+    #     for batch_id in range(len(result)):
+    #         if isinstance(data['points'][0], DC):
+    #             points = data['points'][0]._data[0][batch_id].numpy()
+    #         elif mmcv.is_list_of(data['points'][0], torch.Tensor):
+    #             points = data['points'][0][batch_id]
+    #         else:
+    #             ValueError(f"Unsupported data type {type(data['points'][0])} "
+    #                        f'for visualization!')
+    #         if isinstance(data['img_metas'][0], DC):
+    #             pts_filename = data['img_metas'][0]._data[0][batch_id][
+    #                 'pts_filename']
+    #             box_mode_3d = data['img_metas'][0]._data[0][batch_id][
+    #                 'box_mode_3d']
+    #         elif mmcv.is_list_of(data['img_metas'][0], dict):
+    #             pts_filename = data['img_metas'][0][batch_id]['pts_filename']
+    #             box_mode_3d = data['img_metas'][0][batch_id]['box_mode_3d']
+    #         else:
+    #             ValueError(
+    #                 f"Unsupported data type {type(data['img_metas'][0])} "
+    #                 f'for visualization!')
+    #         file_name = osp.split(pts_filename)[-1].split('.')[0]
 
-            assert out_dir is not None, 'Expect out_dir, got none.'
-            inds = result[batch_id]['pts_bbox']['scores_3d'] > 0.1
-            pred_bboxes = result[batch_id]['pts_bbox']['boxes_3d'][inds]
+    #         assert out_dir is not None, 'Expect out_dir, got none.'
+    #         inds = result[batch_id]['pts_bbox']['scores_3d'] > 0.1
+    #         pred_bboxes = result[batch_id]['pts_bbox']['boxes_3d'][inds]
 
-            # for now we convert points and bbox into depth mode
-            if (box_mode_3d == Box3DMode.CAM) or (box_mode_3d
-                                                  == Box3DMode.LIDAR):
-                points = Coord3DMode.convert_point(points, Coord3DMode.LIDAR,
-                                                   Coord3DMode.DEPTH)
-                pred_bboxes = Box3DMode.convert(pred_bboxes, box_mode_3d,
-                                                Box3DMode.DEPTH)
-            elif box_mode_3d != Box3DMode.DEPTH:
-                ValueError(
-                    f'Unsupported box_mode_3d {box_mode_3d} for convertion!')
+    #         # for now we convert points and bbox into depth mode
+    #         if (box_mode_3d == Box3DMode.CAM) or (box_mode_3d
+    #                                               == Box3DMode.LIDAR):
+    #             points = Coord3DMode.convert_point(points, Coord3DMode.LIDAR,
+    #                                                Coord3DMode.DEPTH)
+    #             pred_bboxes = Box3DMode.convert(pred_bboxes, box_mode_3d,
+    #                                             Box3DMode.DEPTH)
+    #         elif box_mode_3d != Box3DMode.DEPTH:
+    #             ValueError(
+    #                 f'Unsupported box_mode_3d {box_mode_3d} for convertion!')
 
-            pred_bboxes = pred_bboxes.tensor.cpu().numpy()
-            show_result(points, None, pred_bboxes, out_dir, file_name)
+    #         pred_bboxes = pred_bboxes.tensor.cpu().numpy()
+    #         show_result(points, None, pred_bboxes, out_dir, file_name)
