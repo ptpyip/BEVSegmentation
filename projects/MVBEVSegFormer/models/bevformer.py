@@ -4,43 +4,48 @@
 #  Modified by Zhiqi Li
 # ---------------------------------------------
 
-import torch
-from mmcv.runner import force_fp32, auto_fp16
 import time
 import copy
 import numpy as np
+import torch
 
-from mmsegBEV.models import SEGMENTORS
+from mmcv.runner import force_fp32, auto_fp16
+from mmcv.cnn.bricks.transformer import build_transformer_layer_sequence
+
+from mmsegBEV.models import SEGMENTORS, build_head
 from mmsegBEV.models.segmentors import EncoderDecoder
 from bricks import run_time
 from grid_mask import GridMask
 
 @SEGMENTORS.register_module()
-class BEVFormer(EncoderDecoder):
+class MVBEVSegFormer(EncoderDecoder):
     """BEVFormer.
     Args:
         video_test_mode (bool): Decide whether to use temporal information during inference.
     """
 
     def __init__(self,
-                 use_grid_mask=False,
                  img_backbone=None,
                  img_neck=None,
+                 bev_encoder=None,
+                 decoder_head=None,
                  train_cfg=None,
                  test_cfg=None,
                  pretrained=None,
+                 use_grid_mask=False,
                  video_test_mode=False
                  ):
 
-        super(BEVFormer,
-              self).__init__(pts_voxel_layer, pts_voxel_encoder,
-                             pts_middle_encoder, pts_fusion_layer,
-                             img_backbone, pts_backbone, img_neck, pts_neck,
-                             pts_bbox_head, img_roi_head, img_rpn_head,
-                             train_cfg, test_cfg, pretrained)
+        super(MVBEVSegFormer, self).__init__(
+            train_cfg, test_cfg, pretrained,
+            backbone=img_backbone, neck=img_neck, decode_head=decoder_head
+        )
+        self.bev_encoder = build_transformer_layer_sequence(bev_encoder)
+        
         self.grid_mask = GridMask(
             True, True, rotate=1, offset=False, ratio=0.5, mode=1, prob=0.7)
         self.use_grid_mask = use_grid_mask
+        
         self.fp16_enabled = False
 
         # temporal
@@ -51,6 +56,11 @@ class BEVFormer(EncoderDecoder):
             'prev_pos': 0,
             'prev_angle': 0,
         }
+        
+    
+    def _init_decode_head(self, decode_head):
+        """Initialize ``decode_head`` in EncoderDecoder"""
+        self.decode_head = build_head(decode_head)
 
 
     def extract_img_feat(self, img, img_metas, len_queue=None):

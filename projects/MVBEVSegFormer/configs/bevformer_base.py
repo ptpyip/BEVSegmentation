@@ -4,7 +4,7 @@ _base_ = [
 ]
 #
 plugin = True
-plugin_dir = 'projects/mmdet3d_plugin/'
+plugin_dir = "BEVSegmentation/projects/MVBEVSegFormer/models"
 
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
@@ -37,7 +37,7 @@ bev_w_ = 200
 queue_length = 4 # each sequence contains `queue_length` frames.
 
 model = dict(
-    type='BEVFormer',
+    type='MVBEVSegFormer',
     use_grid_mask=True,
     video_test_mode=True,
     img_backbone=dict(
@@ -59,93 +59,96 @@ model = dict(
         add_extra_convs='on_output',
         num_outs=4,
         relu_before_extra_convs=True),
-    pts_bbox_head=dict(
-        type='BEVFormerHead',
+    bev_encoder=dict(
+        type='BEVFormer',
         bev_h=bev_h_,
         bev_w=bev_w_,
         num_query=900,
         num_classes=10,
         in_channels=_dim_,
-        sync_cls_avg_factor=True,
-        with_box_refine=True,
-        as_two_stage=False,
-        transformer=dict(
-            type='PerceptionTransformer',
-            rotate_prev_bev=True,
-            use_shift=True,
-            use_can_bus=True,
-            embed_dims=_dim_,
-            encoder=dict(
-                type='BEVFormerEncoder',
-                num_layers=6,
-                pc_range=point_cloud_range,
-                num_points_in_pillar=4,
-                return_intermediate=False,
-                transformerlayers=dict(
-                    type='BEVFormerLayer',
-                    attn_cfgs=[
-                        dict(
-                            type='TemporalSelfAttention',
-                            embed_dims=_dim_,
-                            num_levels=1),
-                        dict(
-                            type='SpatialCrossAttention',
-                            pc_range=point_cloud_range,
-                            deformable_attention=dict(
-                                type='MSDeformableAttention3D',
-                                embed_dims=_dim_,
-                                num_points=8,
-                                num_levels=_num_levels_),
-                            embed_dims=_dim_,
-                        )
-                    ],
-                    feedforward_channels=_ffn_dim_,
-                    ffn_dropout=0.1,
-                    operation_order=('self_attn', 'norm', 'cross_attn', 'norm',
-                                     'ffn', 'norm'))),
-            decoder=dict(
-                type='DetectionTransformerDecoder',
-                num_layers=6,
-                return_intermediate=True,
-                transformerlayers=dict(
-                    type='DetrTransformerDecoderLayer',
-                    attn_cfgs=[
-                        dict(
-                            type='MultiheadAttention',
-                            embed_dims=_dim_,
-                            num_heads=8,
-                            dropout=0.1),
-                         dict(
-                            type='CustomMSDeformableAttention',
-                            embed_dims=_dim_,
-                            num_levels=1),
-                    ],
-
-                    feedforward_channels=_ffn_dim_,
-                    ffn_dropout=0.1,
-                    operation_order=('self_attn', 'norm', 'cross_attn', 'norm',
-                                     'ffn', 'norm')))),
-        bbox_coder=dict(
-            type='NMSFreeCoder',
-            post_center_range=[-61.2, -61.2, -10.0, 61.2, 61.2, 10.0],
-            pc_range=point_cloud_range,
-            max_num=300,
-            voxel_size=voxel_size,
-            num_classes=10),
+        num_layers=6,
+        # pc_range=point_cloud_range,
+        num_points_in_pillar=4,
+        return_intermediate=False,
+        rotate_prev_bev=True,
+        use_shift=True,
+        use_can_bus=True,
+        embed_dims=_dim_,
+        transformerlayers=dict(
+            type='BEVFormerLayer',
+            attn_cfgs=[
+                dict(
+                    type='TemporalSelfAttention',
+                    embed_dims=_dim_,
+                    num_levels=1),
+                dict(
+                    type='SpatialCrossAttention',
+                    pc_range=point_cloud_range,
+                    deformable_attention=dict(
+                        type='MSDeformableAttention3D',
+                        embed_dims=_dim_,
+                        num_points=8,
+                        num_levels=_num_levels_),
+                    embed_dims=_dim_,
+                )
+            ],
+            feedforward_channels=_ffn_dim_,
+            ffn_dropout=0.1,
+            operation_order=('self_attn', 'norm', 'cross_attn', 'norm',
+                                'ffn', 'norm')
+        ),
         positional_encoding=dict(
-            type='LearnedPositionalEncoding',
-            num_feats=_pos_dim_,
-            row_num_embed=bev_h_,
-            col_num_embed=bev_w_,
-            ),
+        type='LearnedPositionalEncoding',
+        num_feats=_pos_dim_,
+        row_num_embed=bev_h_,
+        col_num_embed=bev_w_,
+        ),
+    ),
+    decoder_head=dict(
+        type='DetectionTransformerDecoder',
+        num_classes=10,
+        num_layers=6,
+        return_intermediate=True,
+        rotate_prev_bev=True,
+        use_shift=True,
+        use_can_bus=True,
+        embed_dims=_dim_,
+        transformerlayers=dict(
+            type='DetrTransformerDecoderLayer',
+            attn_cfgs=[
+                dict(
+                    type='MultiheadAttention',
+                    embed_dims=_dim_,
+                    num_heads=8,
+                    dropout=0.1),
+                    dict(
+                    type='CustomMSDeformableAttention',
+                    embed_dims=_dim_,
+                    num_levels=1),
+            ],
+            feedforward_channels=_ffn_dim_,
+            ffn_dropout=0.1,
+            operation_order=('self_attn', 'norm', 'cross_attn', 'norm',
+                                'ffn', 'norm')
+        ),
         loss_cls=dict(
             type='FocalLoss',
             use_sigmoid=True,
             gamma=2.0,
             alpha=0.25,
-            loss_weight=2.0),
-        loss_bbox=dict(type='L1Loss', loss_weight=0.25),
-        loss_iou=dict(type='GIoULoss', loss_weight=0.0)),
+            loss_weight=2.0
+        )
+    ),
+    
+        # bbox_coder=dict(
+        #     type='NMSFreeCoder',
+        #     post_center_range=[-61.2, -61.2, -10.0, 61.2, 61.2, 10.0],
+        #     pc_range=point_cloud_range,
+        #     max_num=300,
+        #     voxel_size=voxel_size,
+        #     num_classes=10),
+    # loss_bbox=dict(type='L1Loss', loss_weight=0.25),
+    # loss_iou=dict(type='GIoULoss', loss_weight=0.0),
     # model training and testing settings
     train_cfg=dict(pts=dict(
         grid_size=[512, 512, 1],
