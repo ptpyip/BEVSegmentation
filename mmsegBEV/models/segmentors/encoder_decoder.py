@@ -3,8 +3,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mmsegBEV.core import add_prefix
-from mmsegBEV.ops import resize
+from mmseg.core import add_prefix
+from mmseg.ops import resize
+
 from .. import builder
 from ..builder import SEGMENTORS
 from .base import BaseSegmentor
@@ -14,14 +15,14 @@ from .base import BaseSegmentor
 class EncoderDecoder(BaseSegmentor):
     """Encoder Decoder segmentors.
 
-    EncoderDecoder typically consists of backbone, decode_head, auxiliary_head.
+    EncoderDecoder typically consists of backbone, decoder_head, auxiliary_head.
     Note that auxiliary_head is only used for deep supervision during training,
     which could be dumped during inference.
     """
 
     def __init__(self,
                  backbone,
-                 decode_head,
+                 decoder_head,
                  neck=None,
                  auxiliary_head=None,
                  train_cfg=None,
@@ -36,20 +37,20 @@ class EncoderDecoder(BaseSegmentor):
         self.backbone = builder.build_backbone(backbone)
         if neck is not None:
             self.neck = builder.build_neck(neck)
-        self._init_decode_head(decode_head)
+        self._init_decoder_head(decoder_head)
         self._init_auxiliary_head(auxiliary_head)
 
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
 
-        assert self.with_decode_head
+        assert self.with_decoder_head
 
-    def _init_decode_head(self, decode_head):
-        """Initialize ``decode_head``"""
-        self.decode_head = builder.build_head(decode_head)
-        self.align_corners = self.decode_head.align_corners
-        self.num_classes = self.decode_head.num_classes
-        self.out_channels = self.decode_head.out_channels
+    def _init_decoder_head(self, decoder_head):
+        """Initialize ``decoder_head``"""
+        self.decoder_head = builder.build_head(decoder_head)
+        self.align_corners = self.decoder_head.align_corners
+        self.num_classes = self.decoder_head.num_classes
+        self.out_channels = self.decoder_head.out_channels
 
     def _init_auxiliary_head(self, auxiliary_head):
         """Initialize ``auxiliary_head``"""
@@ -72,7 +73,7 @@ class EncoderDecoder(BaseSegmentor):
         """Encode images with backbone and decode into a semantic segmentation
         map of the same size as input."""
         x = self.extract_feat(img)
-        out = self._decode_head_forward_test(x, img_metas)
+        out = self._decoder_head_forward_test(x, img_metas)
         out = resize(
             input=out,
             size=img.shape[2:],
@@ -80,21 +81,21 @@ class EncoderDecoder(BaseSegmentor):
             align_corners=self.align_corners)
         return out
 
-    def _decode_head_forward_train(self, x, img_metas, gt_semantic_seg):
+    def _decoder_head_forward_train(self, x, img_metas, gt_semantic_seg):
         """Run forward function and calculate loss for decode head in
         training."""
         losses = dict()
-        loss_decode = self.decode_head.forward_train(x, img_metas,
+        loss_decode = self.decoder_head.forward_train(x, img_metas,
                                                      gt_semantic_seg,
                                                      self.train_cfg)
 
         losses.update(add_prefix(loss_decode, 'decode'))
         return losses
 
-    def _decode_head_forward_test(self, x, img_metas):
+    def _decoder_head_forward_test(self, x, img_metas):
         """Run forward function and calculate loss for decode head in
         inference."""
-        seg_logits = self.decode_head.forward_test(x, img_metas, self.test_cfg)
+        seg_logits = self.decoder_head.forward_test(x, img_metas, self.test_cfg)
         return seg_logits
 
     def _auxiliary_head_forward_train(self, x, img_metas, gt_semantic_seg):
@@ -141,7 +142,7 @@ class EncoderDecoder(BaseSegmentor):
 
         losses = dict()
 
-        loss_decode = self._decode_head_forward_train(x, img_metas,
+        loss_decode = self._decoder_head_forward_train(x, img_metas,
                                                       gt_semantic_seg)
         losses.update(loss_decode)
 
@@ -266,7 +267,7 @@ class EncoderDecoder(BaseSegmentor):
         seg_logit = self.inference(img, img_meta, rescale)
         if self.out_channels == 1:
             seg_pred = (seg_logit >
-                        self.decode_head.threshold).to(seg_logit).squeeze(1)
+                        self.decoder_head.threshold).to(seg_logit).squeeze(1)
         else:
             seg_pred = seg_logit.argmax(dim=1)
         if torch.onnx.is_in_onnx_export():
@@ -302,7 +303,7 @@ class EncoderDecoder(BaseSegmentor):
         seg_logit /= len(imgs)
         if self.out_channels == 1:
             seg_pred = (seg_logit >
-                        self.decode_head.threshold).to(seg_logit).squeeze(1)
+                        self.decoder_head.threshold).to(seg_logit).squeeze(1)
         else:
             seg_pred = seg_logit.argmax(dim=1)
         seg_pred = seg_pred.cpu().numpy()

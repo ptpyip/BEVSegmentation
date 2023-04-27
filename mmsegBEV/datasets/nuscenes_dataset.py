@@ -53,7 +53,7 @@ class NuScenesDataset(CustomBEVDataset):
 
 
     def union2one(self, queue):
-        data_sample = []
+        data_sample = queue = queue[-1]
         meta_maps = []
         prev_scene_token, prev_pos, prev_angle = None
         
@@ -85,7 +85,6 @@ class NuScenesDataset(CustomBEVDataset):
             
         data_sample['img'] = DataContainer(torch.stack(frames), cpu_only=False, stack=True)
         data_sample['img_metas'] = DataContainer(meta_maps, cpu_only=True)
-        queue = queue[-1]
         return data_sample
 
     def get_data_info(self, index):

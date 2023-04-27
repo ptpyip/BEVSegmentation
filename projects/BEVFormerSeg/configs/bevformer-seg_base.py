@@ -4,7 +4,7 @@ _base_ = [
 ]
 #
 plugin = True
-plugin_dir = "BEVSegmentation/projects/MVBEVSegFormer/models"
+plugin_dir = "projects/BEVFormerSeg/models"
 
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
@@ -60,7 +60,7 @@ model = dict(
         num_outs=4,
         relu_before_extra_convs=True),
     bev_encoder=dict(
-        type='BEVFormer',
+        type='BEVFormerEncoder',
         bev_h=bev_h_,
         bev_w=bev_w_,
         num_query=900,
