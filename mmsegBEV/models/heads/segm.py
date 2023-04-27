@@ -35,25 +35,26 @@ def sigmoid_xent_loss(
 def sigmoid_focal_loss(
     inputs: torch.Tensor,
     targets: torch.Tensor,
-    alpha: float = -1,
+    # alpha: float = -1,
     gamma: float = 2,
     reduction: str = "mean",
 ) -> torch.Tensor:
     inputs = inputs.float()
     targets = targets.float()
 
-    print("Print Target: ")
-    print(targets.dtype)
+    # print("Print Target: ")
+    # print(targets.dtype)
 
     # targets = interpolate(targets, size=(50, 50))
     p = torch.sigmoid(inputs)
+    print(p[0,0,0:10, 0:10])
     ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
     p_t = p * targets + (1 - p) * (1 - targets)
     loss = ce_loss * ((1 - p_t) ** gamma)
 
-    if alpha >= 0:
-        alpha_t = alpha * targets + (1 - alpha) * (1 - targets)
-        loss = alpha_t * loss
+    # if alpha >= 0:
+    #     alpha_t = alpha * targets + (1 - alpha) * (1 - targets)
+    #     loss = alpha_t * loss
 
     if reduction == "mean":
         loss = loss.mean()
@@ -142,8 +143,6 @@ class BEVSegmentationHead(nn.Module):
         self.loss = loss
 
         self.encoder = build_transformer_layer_sequence(transformer.get('encoder'))
-
-        # self.transformer = build_transformer(transformer)
         self.positional_encoding = build_positional_encoding(positional_encoding)
         self.transform = BEVGridTransform(**grid_transform)
         self.classifier = nn.Sequential(
@@ -159,7 +158,6 @@ class BEVSegmentationHead(nn.Module):
 
     def _init_layers(self):
         self.bev_embedding = nn.Embedding(self.bev_h * self.bev_w, 256)
-        # self.query_embedding = nn.Embedding(self.num_query, 256 * 2)
         self.can_bus_mlp = nn.Sequential(
             nn.Linear(18, self.embed_dims // 2),
             nn.ReLU(inplace=True),
@@ -181,10 +179,10 @@ class BEVSegmentationHead(nn.Module):
         bs, num_cam, _, _, _ = x[0].shape
         dtype = x[0].dtype
         
-        print(f"X: {x.shape}")
-        print(x[0,0,0:10, 0:10])
-
-        # object_query_embeds = self.query_embedding.weight.to(dtype)
+        print(f"X: {len(x)}")
+        print(x[0].shape)
+        sample = x[0]
+        print(sample[0,0,0:10, 0:10])
         
         bev_queries = self.bev_embedding.weight.to(dtype)
         
@@ -194,7 +192,6 @@ class BEVSegmentationHead(nn.Module):
 
         x = self.get_bev_features(mlvl_feats=x, 
                                     bev_queries=bev_queries,
-                                    # object_query_embed=object_query_embeds, 
                                     bev_h=self.bev_h, bev_w=self.bev_w,
                                     bev_pos=bev_pos,
                                     prev_bev=prev_bev,
@@ -221,6 +218,11 @@ class BEVSegmentationHead(nn.Module):
         print("After Transform: ")
         print(x[0,0,0:10, 0:10])
         print(torch.any(x>0))
+
+        # x[x<0] = 0
+
+        print("before classifier: ")
+        print(x[0,0,0:10, 0:10])
 
         x = self.classifier(x)
 
