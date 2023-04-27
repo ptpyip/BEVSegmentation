@@ -7,6 +7,7 @@ from mmcv.runner import DistEvalHook as _DistEvalHook
 from mmcv.runner import EvalHook as _EvalHook
 from torch.nn.modules.batchnorm import _BatchNorm
 
+from mmsegBEV.apis import multi_gpu_test
 
 class EvalHook(_EvalHook):
     """Single GPU EvalHook, with efficient test support.
@@ -57,6 +58,7 @@ class DistEvalHook(_DistEvalHook):
     """
 
     greater_keys = ['mIoU', 'mAcc', 'aAcc']
+    
 
     def _do_evaluate(self, runner):
         """perform evaluation and save ckpt."""
@@ -80,13 +82,13 @@ class DistEvalHook(_DistEvalHook):
         if tmpdir is None:
             tmpdir = osp.join(runner.work_dir, '.eval_hook')
 
-        from mmseg.apis import multi_gpu_test
         results = multi_gpu_test(
             runner.model,
             self.dataloader,
             tmpdir=tmpdir,
             gpu_collect=self.gpu_collect,
-            pre_eval=self.pre_eval)
+            pre_eval=self.pre_eval
+        )
         self.latest_results = results
         runner.log_buffer.clear()
 

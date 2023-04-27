@@ -187,7 +187,7 @@ class NuScenesDataset(CustomBEVDataset):
                 continue
             return data
 
-    def evaluate(self,results):
+    def evaluate(self, results, **eval_kwargs):
         """Evaluation for a single model in nuScenes protocol.
 
         Args:

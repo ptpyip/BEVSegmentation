@@ -14,12 +14,43 @@ import torch.distributed as dist
 from mmcv.image import tensor2imgs
 from mmcv.runner import get_dist_info
 
-from mmdet.core import encode_mask_results
-
-
+# from mmdet.core import encode_mask_results
 import mmcv
 import numpy as np
 import pycocotools.mask as mask_util
+
+
+from .utils import getDataLoader, loadModel2GPU
+
+def test_model( model, dataset, cfg, distributed=True, format_only=False,timestamp=None):
+    ## prepare data loader
+    dataloader = getDataLoader(dataset, cfg, distributed, shuffle=False)
+    model = loadModel2GPU(model, cfg, distributed)
+    
+    outputs = multi_gpu_test(model, dataloader)
+    
+    rank, _ = get_dist_info()
+    if rank == 0:
+        if format_only:            
+            kwargs = {} 
+            kwargs['jsonfile_prefix'] = os.path.join(
+                'test', 
+                cfg.filename.split('/')[-1].split('.')[-2], 
+                time.ctime().replace(' ', '_').replace(':', '_')
+            )
+        
+            dataset.format_results(outputs, **kwargs)
+        else:
+            eval_kwargs = cfg.get('evaluation', {}).copy()
+            # hard-code way to remove EvalHook args
+            for key in [
+                    'interval', 'tmpdir', 'start', 'gpu_collect', 'save_best',
+                    'rule'
+            ]:
+                eval_kwargs.pop(key, None)
+
+            print(dataset.evaluate(outputs, **eval_kwargs))
+    
 
 def single_gpu_test(model, data_loader):
     model.eval()
