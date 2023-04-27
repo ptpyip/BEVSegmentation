@@ -42,15 +42,31 @@ def sigmoid_focal_loss(
     inputs = inputs.float()
     targets = targets.float()
 
-    # print("Print Target: ")
-    # print(targets.dtype)
+    print("Loss function: ")
+    # print(f" Target: {targets[0,0,0:10,0:10]}")
+    print(f" Inputs: {torch.isnan(inputs)}")
 
     # targets = interpolate(targets, size=(50, 50))
     p = torch.sigmoid(inputs)
-    print(p[0,0,0:10, 0:10])
-    ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+    
+    print('\n')
+    print(f"  After exponential {torch.isnan(p)}")
+    
+    eps = 1e-8
+    ce_loss = F.binary_cross_entropy_with_logits(inputs + eps, targets, reduction="none")
+    
+    print('\n')
+    print(f"     After binary_cross_entropy: {torch.isnan(ce_loss)}")
+    
     p_t = p * targets + (1 - p) * (1 - targets)
+    
+    print('\n')
+    print(f"        p_t : {torch.isnan(p_t)}")
+    
     loss = ce_loss * ((1 - p_t) ** gamma)
+
+    print('\n')
+    print(f"           loss : {torch.isnan(loss)}")
 
     # if alpha >= 0:
     #     alpha_t = alpha * targets + (1 - alpha) * (1 - targets)
@@ -145,13 +161,17 @@ class BEVSegmentationHead(nn.Module):
         self.encoder = build_transformer_layer_sequence(transformer.get('encoder'))
         self.positional_encoding = build_positional_encoding(positional_encoding)
         self.transform = BEVGridTransform(**grid_transform)
-        self.classifier = nn.Sequential(
+        
+        self.classifier1 = nn.Sequential(
             nn.Conv2d(in_channels, in_channels, 3, padding=1, bias=False),
-            nn.BatchNorm2d(in_channels),
-            nn.ReLU(True),
+            # nn.BatchNorm2d(in_channels),
+            # nn.ReLU(True),
+        )
+        
+        self.classifier2 = nn.Sequential(
             nn.Conv2d(in_channels, in_channels, 3, padding=1, bias=False),
-            nn.BatchNorm2d(in_channels),
-            nn.ReLU(True),
+            # nn.BatchNorm2d(in_channels),
+            # nn.ReLU(True),
             nn.Conv2d(in_channels, num_classes, 1),
         )
         self._init_layers()
@@ -179,10 +199,9 @@ class BEVSegmentationHead(nn.Module):
         bs, num_cam, _, _, _ = x[0].shape
         dtype = x[0].dtype
         
-        print(f"X: {len(x)}")
-        print(x[0].shape)
-        sample = x[0]
-        print(sample[0,0,0:10, 0:10])
+        print(f"X: {len(x)} and shape : {x[0].shape}")
+        # sample = x[0]
+        # print(sample)
         
         bev_queries = self.bev_embedding.weight.to(dtype)
         
@@ -200,43 +219,54 @@ class BEVSegmentationHead(nn.Module):
         if target is None:
             return x
 
-        print(f"x : {len(x)}")
-        print(f"x[0] : {x[0].shape}")
+        # print(f"x : {x.shape}")
+        print(f"After get_bev_features x[0] : {torch.isnan(x[0])}")
 
         # (1, 200*200, 256)
         x = torch.reshape(x, (1, self.bev_h, self.bev_w, -1))  #(BS, h, w, dim) = (1, 200, 200, 256)
         x = torch.permute(x, (0, 3, 1, 2)) # (BS, dim, h, w) = (1, 256, 200, 200)
 
-        print("After get bev features: ")
-        print(x[0,0,0:10, 0:10])
+        # print("After get bev features: ")
+        # print(x[0,0,0:10, 0:10])
 
 
-        print(f"x : {x.shape}")
+        # print(f"x : {x.shape}")
 
         x = self.transform(x)
 
-        print("After Transform: ")
-        print(x[0,0,0:10, 0:10])
-        print(torch.any(x>0))
+        print(f" After Transform: {torch.isnan(x)}")
+        # print(torch.any(x>0))
 
         # x[x<0] = 0
 
-        print("before classifier: ")
-        print(x[0,0,0:10, 0:10])
+        print(f"   before classifier1: {torch.isnan(x)}")
 
-        x = self.classifier(x)
+        x = self.classifier1(x)
 
-        print("From /data/ddoo/projects/bevseg/BEVSegmentation/mmsegBEV/models/heads/segm.py, line 201: ")
-        print(x.shape)
+        print(f"   after classifier1 and before classifier2:  {torch.isnan(x)}")
+
+        x = self.classifier2(x)
+
+        print(f"   after classifier2: {torch.isnan(x)}")
+        # print(x)
+
+
+        # print("From /data/ddoo/projects/bevseg/BEVSegmentation/mmsegBEV/models/heads/segm.py, line 201: ")
+        # print(x.shape)
+
+        # print("After classifier: ")
+        # print(x[0,0,0:10, 0:10])
+
 
         losses = dict()
         losses['loss'] = sigmoid_focal_loss(x, target)
 
-        print("After classifier: ")
-        print(x[0,0,0:10, 0:10])
+        # print("After loss: ")
+        # print(x[0,0,0:10, 0:10])
 
-        print("GT: ")
-        print(target[0,0,0:10,0:10])
+
+        # print("GT: ")
+        # print(target[0,0,0:10,0:10])
 
         # x_vis = x[0,0,:,:].cpu().detach().numpy()
         # x_vis = x_vis>= 0.5
@@ -306,12 +336,9 @@ class BEVSegmentationHead(nn.Module):
         bev_pos = bev_pos.flatten(2).permute(2, 0, 1)
 
         # obtain rotation angle and shift with ego motion
-        delta_x = np.array([each['can_bus'][0]
-                           for each in kwargs['img_metas']])
-        delta_y = np.array([each['can_bus'][1]
-                           for each in kwargs['img_metas']])
-        ego_angle = np.array(
-            [each['can_bus'][-2] / np.pi * 180 for each in kwargs['img_metas']])
+        delta_x = np.array([each['can_bus'][0] for each in kwargs['img_metas']])
+        delta_y = np.array([each['can_bus'][1] for each in kwargs['img_metas']])
+        ego_angle = np.array([each['can_bus'][-2] / np.pi * 180 for each in kwargs['img_metas']])
         grid_length_y = grid_length[0]
         grid_length_x = grid_length[1]
         translation_length = np.sqrt(delta_x ** 2 + delta_y ** 2)
@@ -327,18 +354,16 @@ class BEVSegmentationHead(nn.Module):
             [shift_x, shift_y]).permute(1, 0)  # xy, bs -> bs, xy
 
         if prev_bev is not None:
+            print(f"In get_bev_features prev_bev : {torch.any(torch.isnan(prev_bev))}")
             if prev_bev.shape[1] == bev_h * bev_w:
                 prev_bev = prev_bev.permute(1, 0, 2)
             if self.rotate_prev_bev:
                 for i in range(bs):
                     # num_prev_bev = prev_bev.size(1)
                     rotation_angle = kwargs['img_metas'][i]['can_bus'][-1]
-                    tmp_prev_bev = prev_bev[:, i].reshape(
-                        bev_h, bev_w, -1).permute(2, 0, 1)
-                    tmp_prev_bev = rotate(tmp_prev_bev, rotation_angle,
-                                          center=self.rotate_center)
-                    tmp_prev_bev = tmp_prev_bev.permute(1, 2, 0).reshape(
-                        bev_h * bev_w, 1, -1)
+                    tmp_prev_bev = prev_bev[:, i].reshape(bev_h, bev_w, -1).permute(2, 0, 1)
+                    tmp_prev_bev = rotate(tmp_prev_bev, rotation_angle,center=self.rotate_center)
+                    tmp_prev_bev = tmp_prev_bev.permute(1, 2, 0).reshape(bev_h * bev_w, 1, -1)
                     prev_bev[:, i] = tmp_prev_bev[:, 0]
 
         # add can bus signals
@@ -354,18 +379,22 @@ class BEVSegmentationHead(nn.Module):
             feat = feat.flatten(3).permute(1, 0, 3, 2)
             if self.use_cams_embeds:
                 feat = feat + self.cams_embeds[:, None, None, :].to(feat.dtype)
-            feat = feat + self.level_embeds[None,
-                                            None, lvl:lvl + 1, :].to(feat.dtype)
+            feat = feat + self.level_embeds[None, None, lvl:lvl + 1, :].to(feat.dtype)
             spatial_shapes.append(spatial_shape)
             feat_flatten.append(feat)
 
         feat_flatten = torch.cat(feat_flatten, 2)
-        spatial_shapes = torch.as_tensor(
-            spatial_shapes, dtype=torch.long, device=bev_pos.device)
-        level_start_index = torch.cat((spatial_shapes.new_zeros(
-            (1,)), spatial_shapes.prod(1).cumsum(0)[:-1]))
+        spatial_shapes = torch.as_tensor(spatial_shapes, dtype=torch.long, device=bev_pos.device)
+        level_start_index = torch.cat((spatial_shapes.new_zeros((1,)), spatial_shapes.prod(1).cumsum(0)[:-1]))
 
         feat_flatten = feat_flatten.permute(0, 2, 1, 3)  # (num_cam, H*W, bs, embed_dims)
+
+        # print(f"In get_bev_features bev_queries : {torch.isnan(bev_queries)}")
+
+        if prev_bev is not None:
+            print(f"In get_bev_features prev_bev before encoder : {torch.any(torch.isnan(prev_bev))}")
+        else:
+            print("prev_bev is nan")
 
         bev_embed = self.encoder(
             bev_queries,
@@ -380,5 +409,7 @@ class BEVSegmentationHead(nn.Module):
             shift=shift,
             **kwargs
         )
+
+        print(f"bev_embed in segm.py: {torch.any(torch.isnan(prev_bev))}")
 
         return bev_embed
