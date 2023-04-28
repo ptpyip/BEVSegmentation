@@ -9,14 +9,14 @@ deterministic = False
 plugin = True
 plugin_dir = 'projects/mmdet3d_plugin/'
 
-image_size = [256, 704]
+# image_size = [256, 704]
 _dim_ = 256
 _pos_dim_ = _dim_//2
 _ffn_dim_ = _dim_*2
 _num_levels_ = 4
 bev_h_ = 200
 bev_w_ = 200
-queue_length = 3 # each sequence contains `queue_length` frames.
+queue_length = 2 # each sequence contains `queue_length` frames.
 
 point_cloud_range = [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
 voxel_size = [0.2, 0.2, 8]

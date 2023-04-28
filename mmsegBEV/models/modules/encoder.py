@@ -106,18 +106,15 @@ class BEVFormerEncoder(TransformerLayerSequence):
         reference_points[..., 2:3] = reference_points[..., 2:3] * \
             (pc_range[5] - pc_range[2]) + pc_range[2]
 
-        reference_points = torch.cat(
-            (reference_points, torch.ones_like(reference_points[..., :1])), -1)
+        reference_points = torch.cat((reference_points, torch.ones_like(reference_points[..., :1])), -1)
 
         reference_points = reference_points.permute(1, 0, 2, 3)
         D, B, num_query = reference_points.size()[:3]
         num_cam = lidar2img.size(1)
 
-        reference_points = reference_points.view(
-            D, B, 1, num_query, 4).repeat(1, 1, num_cam, 1, 1).unsqueeze(-1)
+        reference_points = reference_points.view(D, B, 1, num_query, 4).repeat(1, 1, num_cam, 1, 1).unsqueeze(-1)
 
-        lidar2img = lidar2img.view(
-            1, B, num_cam, 1, 4, 4).repeat(D, 1, 1, num_query, 1, 1)
+        lidar2img = lidar2img.view(1, B, num_cam, 1, 4, 4).repeat(D, 1, 1, num_query, 1, 1)
 
         reference_points_cam = torch.matmul(lidar2img.to(torch.float32),
                                             reference_points.to(torch.float32)).squeeze(-1)
@@ -205,8 +202,7 @@ class BEVFormerEncoder(TransformerLayerSequence):
             hybird_ref_2d = torch.stack([shift_ref_2d, ref_2d], 1).reshape(
                 bs*2, len_bev, num_bev_level, 2)
         else:
-            hybird_ref_2d = torch.stack([ref_2d, ref_2d], 1).reshape(
-                bs*2, len_bev, num_bev_level, 2)
+            hybird_ref_2d = torch.stack([ref_2d, ref_2d], 1).reshape(bs*2, len_bev, num_bev_level, 2)
 
         for lid, layer in enumerate(self.layers):
             output = layer(

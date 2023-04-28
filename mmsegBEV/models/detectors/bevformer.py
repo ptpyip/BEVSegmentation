@@ -139,6 +139,7 @@ class BEVFormer(MVXTwoStageDetector):
     def obtain_history_bev(self, imgs_queue, img_metas_list):
         """Obtain history BEV features iteratively. To save GPU memory, gradients are not calculated.
         """
+        print(f"obtain_history_bev features: ")
         self.eval()
         with torch.no_grad():
             prev_bev = None
@@ -153,6 +154,7 @@ class BEVFormer(MVXTwoStageDetector):
                 img_feats = [each_scale[:, i] for each_scale in img_feats_list]
                 prev_bev = self.seg_head(img_feats, img_metas, prev_bev)
             self.train()
+            print(f"  prev_bev from history : {torch.any(torch.isnan(prev_bev))} ")
             return prev_bev
 
     def forward_seg_train(self, 
@@ -186,7 +188,9 @@ class BEVFormer(MVXTwoStageDetector):
 
         img_metas = [each[len_queue-1] for each in img_metas]
         if not img_metas[0]['prev_bev_exists']:
+            print("First time training! or prev_bev not exists")
             prev_bev = None
+        
         img_feats = self.extract_feat(img=img, img_metas=img_metas)
         
         outputs = {}
