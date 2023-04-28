@@ -11,7 +11,7 @@ from mmcv.cnn.bricks.transformer import build_positional_encoding
 from torchvision.transforms.functional import rotate
 
 import os
-from mmsegBEV.core.utils import visualize_map
+# from mmsegBEV.core.utils import visualize_map
 
 import numpy as np
 
@@ -182,6 +182,7 @@ class BEVSegmentationHead(nn.Module):
         print(f"X: {len(x)}")
         print(x[0].shape)
         sample = x[0]
+        sample = x
         print(sample[0,0,0:10, 0:10])
         
         bev_queries = self.bev_embedding.weight.to(dtype)

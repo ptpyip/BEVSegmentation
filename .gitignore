@@ -5,12 +5,14 @@ __pycache__/
 
 # datasets
 data/
+data
 
 # checkpoints
 ckpts/
 
 # work directories
 work_dirs/
+
 
 
 # C extensions
