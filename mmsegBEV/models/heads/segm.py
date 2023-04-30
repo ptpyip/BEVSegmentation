@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import torch
 from torch import nn
 from torch.nn import functional as F
+from torch.nn.init import normal_
 from torch.nn.functional import interpolate
 
 from ..builder import HEADS, build_transformer
@@ -42,31 +43,31 @@ def sigmoid_focal_loss(
     inputs = inputs.float()
     targets = targets.float()
 
-    print("Loss function: ")
-    # print(f" Target: {targets[0,0,0:10,0:10]}")
-    print(f" Inputs: {torch.isnan(inputs)}")
+    # print("Loss function: ")
+    # # print(f" Target: {targets[0,0,0:10,0:10]}")
+    # print(f" Inputs: {torch.isnan(inputs).unique()}")
 
     # targets = interpolate(targets, size=(50, 50))
     p = torch.sigmoid(inputs)
     
-    print('\n')
-    print(f"  After exponential {torch.isnan(p)}")
+    # print('\n')
+    # print(f"  After exponential {torch.isnan(p).unique()}")
     
     eps = 1e-8
     ce_loss = F.binary_cross_entropy_with_logits(inputs + eps, targets, reduction="none")
     
-    print('\n')
-    print(f"     After binary_cross_entropy: {torch.isnan(ce_loss)}")
+    # print('\n')
+    # print(f"     After binary_cross_entropy: {torch.isnan(ce_loss).unique()}")
     
     p_t = p * targets + (1 - p) * (1 - targets)
     
-    print('\n')
-    print(f"        p_t : {torch.isnan(p_t)}")
+    # print('\n')
+    # print(f"        p_t : {torch.isnan(p_t).unique()}")
     
     loss = ce_loss * ((1 - p_t) ** gamma)
 
-    print('\n')
-    print(f"           loss : {torch.isnan(loss)}")
+    # print('\n')
+    # print(f"           loss : {torch.isnan(loss).unique()}")
 
     # if alpha >= 0:
     #     alpha_t = alpha * targets + (1 - alpha) * (1 - targets)
@@ -108,8 +109,9 @@ class BEVGridTransform(nn.Module):
             v = torch.arange(omin + ostep / 2, omax, ostep)
             v = (v - imin) / (imax - imin) * 2 - 1
             coords.append(v.to(x.device))
+            
         
-        u, v = torch.meshgrid(coords, indexing="ij")
+        u, v = torch.meshgrid(coords)
         grid = torch.stack([v, u], dim=-1)
         grid = torch.stack([grid] * x.shape[0], dim=0)
 
@@ -162,13 +164,10 @@ class BEVSegmentationHead(nn.Module):
         self.positional_encoding = build_positional_encoding(positional_encoding)
         self.transform = BEVGridTransform(**grid_transform)
         
-        self.classifier1 = nn.Sequential(
+        self.classifier = nn.Sequential(
             nn.Conv2d(in_channels, in_channels, 3, padding=1, bias=False),
-            # nn.BatchNorm2d(in_channels),
-            # nn.ReLU(True),
-        )
-        
-        self.classifier2 = nn.Sequential(
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(True),
             nn.Conv2d(in_channels, in_channels, 3, padding=1, bias=False),
             # nn.BatchNorm2d(in_channels),
             # nn.ReLU(True),
@@ -184,8 +183,16 @@ class BEVSegmentationHead(nn.Module):
             nn.Linear(self.embed_dims // 2, self.embed_dims),
             nn.ReLU(inplace=True),
         )
-        self.cams_embeds = nn.Parameter(torch.Tensor(self.num_cams, self.embed_dims))
-        self.level_embeds = nn.Parameter(torch.Tensor(self.num_feature_levels, self.embed_dims))
+        # self.cams_embeds = nn.Parameter(torch.Tensor(self.num_cams, self.embed_dims))
+        # self.level_embeds = nn.Parameter(torch.Tensor(self.num_feature_levels, self.embed_dims))
+        
+        self.level_embeds = nn.Parameter(torch.Tensor(
+            self.num_feature_levels, self.embed_dims))
+        self.cams_embeds = nn.Parameter(
+            torch.Tensor(self.num_cams, self.embed_dims))
+        
+        normal_(self.level_embeds)
+        normal_(self.cams_embeds)
 
 
     def forward(
@@ -194,14 +201,15 @@ class BEVSegmentationHead(nn.Module):
         img_metas,
         prev_bev,
         target=None,
+        only_bev=False
     ) -> Union[torch.Tensor, Dict[str, Any]]:
 
         bs, num_cam, _, _, _ = x[0].shape
         dtype = x[0].dtype
         
-        print(f"X: {len(x)} and shape : {x[0].shape}")
+        # print(f"X: {len(x)} and shape : {x[0].shape}")
         # sample = x[0]
-        # print(sample)
+        # # print(sample)
         
         bev_queries = self.bev_embedding.weight.to(dtype)
         
@@ -209,64 +217,61 @@ class BEVSegmentationHead(nn.Module):
         
         bev_pos = self.positional_encoding(bev_mask).to(dtype)
 
-        x = self.get_bev_features(mlvl_feats=x, 
+        bev_feat = self.get_bev_features(mlvl_feats=x, 
                                     bev_queries=bev_queries,
                                     bev_h=self.bev_h, bev_w=self.bev_w,
                                     bev_pos=bev_pos,
                                     prev_bev=prev_bev,
                                     img_metas=img_metas)
 
-        if target is None:
-            return x
+        if only_bev:
+            return bev_feat
+        
+        x = bev_feat
 
-        # print(f"x : {x.shape}")
-        print(f"After get_bev_features x[0] : {torch.isnan(x[0])}")
+        # # print(f"x : {x.shape}")
+        # print(f"After get_bev_features x[0] : {torch.isnan(x[0]).unique()}")
 
         # (1, 200*200, 256)
         x = torch.reshape(x, (1, self.bev_h, self.bev_w, -1))  #(BS, h, w, dim) = (1, 200, 200, 256)
         x = torch.permute(x, (0, 3, 1, 2)) # (BS, dim, h, w) = (1, 256, 200, 200)
 
-        # print("After get bev features: ")
-        # print(x[0,0,0:10, 0:10])
+        # # print("After get bev features: ")
+        # # print(x[0,0,0:10, 0:10])
 
 
-        # print(f"x : {x.shape}")
+        # # print(f"x : {x.shape}")
 
         x = self.transform(x)
 
-        print(f" After Transform: {torch.isnan(x)}")
-        # print(torch.any(x>0))
+        # # print(f" After Transform: {torch.isnan(x).unique()}")
+        # # # print(torch.any(x>0))
 
-        # x[x<0] = 0
+        # # x[x<0] = 0
 
-        print(f"   before classifier1: {torch.isnan(x)}")
+        # # print(f"   before classifier1: {torch.isnan(x).unique()}")
 
-        x = self.classifier1(x)
-
-        print(f"   after classifier1 and before classifier2:  {torch.isnan(x)}")
-
-        x = self.classifier2(x)
-
-        print(f"   after classifier2: {torch.isnan(x)}")
-        # print(x)
-
-
-        # print("From /data/ddoo/projects/bevseg/BEVSegmentation/mmsegBEV/models/heads/segm.py, line 201: ")
-        # print(x.shape)
-
-        # print("After classifier: ")
-        # print(x[0,0,0:10, 0:10])
+        x = self.classifier(x)
+        
+        
+        # for index, name in enumerate(self.classes):
+        #     if self.loss == "xent":
+        #         loss = sigmoid_xent_loss(x[:, index], target[:, index])
+        #     elif self.loss == "focal":
+        #         loss = sigmoid_focal_loss(x[:, index], target[:, index])
+        #     else:
+        #         raise ValueError(f"unsupported loss: {self.loss}")
+        #     losses[f"{name}/{self.loss}"] = loss
+        # return losses
 
 
-        losses = dict()
-        losses['loss'] = sigmoid_focal_loss(x, target)
 
-        # print("After loss: ")
-        # print(x[0,0,0:10, 0:10])
+        # # print("After loss: ")
+        # # print(x[0,0,0:10, 0:10])
 
 
-        # print("GT: ")
-        # print(target[0,0,0:10,0:10])
+        # # print("GT: ")
+        # # print(target[0,0,0:10,0:10])
 
         # x_vis = x[0,0,:,:].cpu().detach().numpy()
         # x_vis = x_vis>= 0.5
@@ -287,9 +292,15 @@ class BEVSegmentationHead(nn.Module):
         # )
 
 
-        raise NotImplementedError("Stop")
-
-        return losses
+        # raise NotImplementedError("Stop")
+        if target is None:
+            return bev_feat, torch.sigmoid(x)
+        
+        else:
+            losses = dict()
+            losses['loss'] = sigmoid_focal_loss(x, target)
+            return losses
+            
     """
         def forward(
             self,
@@ -330,6 +341,10 @@ class BEVSegmentationHead(nn.Module):
         """
         obtain bev features.
         """
+        
+        # print(f"cams_embeds: {torch.isnan(self.cams_embeds).unique()}")
+        # print(f"level_embeds: {torch.isnan(self.level_embeds).unique()}")
+        
 
         bs = mlvl_feats[0].size(0)
         bev_queries = bev_queries.unsqueeze(1).repeat(1, bs, 1)
@@ -354,7 +369,7 @@ class BEVSegmentationHead(nn.Module):
             [shift_x, shift_y]).permute(1, 0)  # xy, bs -> bs, xy
 
         if prev_bev is not None:
-            print(f"In get_bev_features prev_bev : {torch.any(torch.isnan(prev_bev))}")
+            # print(f"In get_bev_features prev_bev : {torch.isnan(prev_bev).unique()}")
             if prev_bev.shape[1] == bev_h * bev_w:
                 prev_bev = prev_bev.permute(1, 0, 2)
             if self.rotate_prev_bev:
@@ -374,6 +389,8 @@ class BEVSegmentationHead(nn.Module):
         feat_flatten = []
         spatial_shapes = []
         for lvl, feat in enumerate(mlvl_feats):
+                
+            # print(f"mlvl_feats_{lvl}_before {feat.shape}: {torch.isnan(feat).unique()}")
             bs, num_cam, c, h, w = feat.shape
             spatial_shape = (h, w)
             feat = feat.flatten(3).permute(1, 0, 3, 2)
@@ -382,19 +399,28 @@ class BEVSegmentationHead(nn.Module):
             feat = feat + self.level_embeds[None, None, lvl:lvl + 1, :].to(feat.dtype)
             spatial_shapes.append(spatial_shape)
             feat_flatten.append(feat)
+            # print(f"mlvl_feats_{lvl}_after {feat.shape}: {torch.isnan(feat).unique()}")
 
+        
         feat_flatten = torch.cat(feat_flatten, 2)
+        
         spatial_shapes = torch.as_tensor(spatial_shapes, dtype=torch.long, device=bev_pos.device)
         level_start_index = torch.cat((spatial_shapes.new_zeros((1,)), spatial_shapes.prod(1).cumsum(0)[:-1]))
 
         feat_flatten = feat_flatten.permute(0, 2, 1, 3)  # (num_cam, H*W, bs, embed_dims)
 
-        # print(f"In get_bev_features bev_queries : {torch.isnan(bev_queries)}")
+        # # print(f"In get_bev_features bev_queries : {torch.isnan(bev_queries)}")
 
         if prev_bev is not None:
-            print(f"In get_bev_features prev_bev before encoder : {torch.any(torch.isnan(prev_bev))}")
+            # print(f"In get_bev_features prev_bev before encoder : {torch.isnan(prev_bev).unique()}")
+            ...
         else:
-            print("prev_bev is nan")
+            # print("prev_bev is None")
+            ...
+            
+        # print(f"bev_quries: {torch.isnan(bev_queries).unique()}")
+        # print(f"feat_flatten: {torch.isnan(feat_flatten).unique()}")
+        # print(f"bev_pos: {torch.isnan(bev_pos).unique()}")
 
         bev_embed = self.encoder(
             bev_queries,
@@ -410,6 +436,9 @@ class BEVSegmentationHead(nn.Module):
             **kwargs
         )
 
-        print(f"bev_embed in segm.py: {torch.any(torch.isnan(prev_bev))}")
+        # if bev_embed is not None:
+        #     # print(f"bev_embed in segm.py: {torch.isnan(bev_embed).unique()}")
+        # else:
+        #     # print("bev_embed is None")
 
         return bev_embed
