@@ -53,12 +53,12 @@ def build_dataloader(
         DataLoader: A PyTorch dataloader.
     """
     rank, world_size = get_dist_info()
-    if dist:
+
+    batch_size = samples_per_gpu
+    num_workers = workers_per_gpu
+    if shuffle:
         # DistributedGroupSampler will definitely shuffle the data to satisfy
         # that images on each GPU are in the same group
-
-        batch_size = samples_per_gpu
-        num_workers = workers_per_gpu
         sample_arg = dict(samples_per_gpu=samples_per_gpu) if shuffle else {}
         
         sampler = build_sampler(
@@ -73,7 +73,15 @@ def build_dataloader(
         )
         
     else:
-        assert False, 'not support in bevformer'        
+        sampler = build_sampler(
+            nonshuffler_sampler if nonshuffler_sampler is not None else dict(type='DistributedSampler'),
+            dict(
+                dataset=dataset,
+                num_replicas=world_size,
+                rank=rank,
+                shuffle=shuffle,
+                seed=seed)
+            )       
 
     init_fn = partial(
         worker_init_fn, num_workers=num_workers, rank=rank,

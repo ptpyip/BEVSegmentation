@@ -12,7 +12,7 @@ from mmcv.runner import (HOOKS, DistSamplerSeedHook, EpochBasedRunner,
                          build_runner, get_dist_info)
 from mmcv.utils import build_from_cfg
 
-from mmdet.core import EvalHook
+# from mmdet.core import EvalHook
 
 from mmdet.datasets import (build_dataset,
                             replace_ImageToTensor)
@@ -22,7 +22,9 @@ from os import path
 
 from mmsegBEV.datasets import build_dataloader
 from mmsegBEV.utils import get_root_logger
-from mmsegBEV.evaluation import DistEvalHook
+from mmsegBEV.evaluation import DistEvalHook, EvalHook
+
+from .test import multi_gpu_test, single_gpu_test
 
 def train_model(
         model,
@@ -106,7 +108,7 @@ def train_model(
     elif cfg.load_from:
         runner.load_checkpoint(cfg.load_from)       
     
-    print("Runner!!")
+    # print("Runner!!")
     
     # print(f"Dataloader for train in train.py with {len(dataloader_train[0])}")
     # for i, data_batch in enumerate(dataloader_train[0]):
@@ -115,7 +117,9 @@ def train_model(
     #         for key in data_batch.keys():
     #             print(key)
     #         raise NotImplementedError("no")
-
+    # print(type(runner._hooks[4]))
+    # runner._hooks[4]._do_evaluate(runner)
+    
     runner.run(dataloader_train, cfg.workflow)
     
 def getDataLoader(dataset, cfg, distributed=False, samples_per_gpu=None, shuffle=None):
@@ -181,8 +185,13 @@ def registerValHooks(runner, dataloader_val, cfg, distributed=False):
     eval_cfg = cfg.get('evaluation', {})
     eval_cfg['by_epoch'] = cfg.runner['type'] != 'IterBasedRunner'
     eval_cfg['jsonfile_prefix'] = path.join('val', cfg.work_dir, time.ctime().replace(' ','_').replace(':','_'))
-    eval_hook = DistEvalHook if distributed else EvalHook
-    runner.register_hook(eval_hook(dataloader_val, **eval_cfg))
+    
+    if distributed:
+        eval_hook = DistEvalHook(dataloader_val, test_fn=multi_gpu_test, **eval_cfg)
+    else:
+        eval_hook = EvalHook(dataloader_val, test_fn=single_gpu_test, **eval_cfg)
+    
+    runner.register_hook(eval_hook)
 
 # def train_model(model,
 #                 dataset,
