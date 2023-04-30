@@ -1,13 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import mmcv
-import torch
-from mmcv.parallel import DataContainer as DC
+
 from mmcv.runner import auto_fp16
-from os import path as osp
-
-# from mmsegBEV.core import Box3DMode, Coord3DMode, show_result
 from mmdet.models.detectors import BaseDetector
-
 
 class Base3DDetector(BaseDetector):
     """Base class for detectors."""

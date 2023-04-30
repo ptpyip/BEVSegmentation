@@ -5,21 +5,11 @@ import numpy as np
 import torch
 
 from nuscenes.eval.common.utils import quaternion_yaw, Quaternion
-import tempfile
-from nuscenes.utils.data_classes import Box as NuScenesBox
-from os import path as osp
 
 from mmcv.parallel import DataContainer
 
 from .builder import DATASETS
 from .custom import CustomBEVDataset
-
-# from mmdet.datasets import DATASETS
-# from ..core import show_result
-# from ..core.bbox import Box3DMode, Coord3DMode, LiDARInstance3DBoxes
-from .custom import CustomBEVDataset
-from .pipelines import Compose
-
 
 @DATASETS.register_module()
 class NuScenesDataset(CustomBEVDataset):

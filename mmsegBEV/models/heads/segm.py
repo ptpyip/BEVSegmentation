@@ -1,27 +1,24 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import numpy as np
+
 import torch
 from torch import nn
 from torch.nn import functional as F
 from torch.nn.init import normal_
 from torch.nn.functional import interpolate
 
-from ..builder import HEADS, build_transformer
 from mmcv.cnn.bricks.transformer import build_transformer_layer_sequence
 from mmcv.cnn.bricks.transformer import build_positional_encoding
 from torchvision.transforms.functional import rotate
 
-import os
-# from mmsegBEV.core.utils import visualize_map
-
-import numpy as np
+from ..builder import HEADS, build_transformer
 
 __all__ = ["BEVSegmentationHead"]
 
 map_classes = ['drivable_area', 'ped_crossing', 
                'walkway', 'stop_line',
                'carpark_area', 'divider']
-
 
 def sigmoid_xent_loss(
     inputs: torch.Tensor,

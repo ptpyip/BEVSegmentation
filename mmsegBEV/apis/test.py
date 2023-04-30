@@ -3,21 +3,17 @@
 # ---------------------------------------------
 
 import os.path
-import pickle
 import shutil
 import tempfile
 import time
+from pycocotools.mask import encode as mask_encode
 
-import mmcv
+import numpy as np
 import torch
 import torch.distributed as dist
-from mmcv.image import tensor2imgs
-from mmcv.runner import get_dist_info
 
-# from mmdet.core import encode_mask_results
 import mmcv
-import numpy as np
-import pycocotools.mask as mask_util
+from mmcv.runner import get_dist_info
 
 from .utils import getDataLoader, loadModel2GPU
 
@@ -188,7 +184,7 @@ def custom_encode_mask_results(mask_results):
     encoded_mask_results = []
     for i in range(len(cls_segms)):
         encoded_mask_results.append(
-            mask_util.encode(
+            mask_encode(
                 np.array(
                     cls_segms[i][:, :, np.newaxis], order='F',
                         dtype='uint8'))[0])  # encoded with RLE

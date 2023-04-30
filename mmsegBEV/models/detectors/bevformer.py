@@ -1,25 +1,19 @@
 # ---------------------------------------------
 # Copyright (c) OpenMMLab. All rights reserved.
 # ---------------------------------------------
-#  Modified by Zhiqi Li
+#  Modified by Paco base on modificaion from Zhiqi Li
 # ---------------------------------------------
 
 import torch
-from mmcv.runner import force_fp32, auto_fp16
-# from mmsegBEV.core import bbox3d2result
-from mmsegBEV.models.detectors.mvx_two_stage import MVXTwoStageDetector
-import time
-import copy
-import numpy as np
-
-from mmsegBEV.models import DETECTORS
-from ..builder import build_head
-
-from ..bricks import run_time
-from ..grid_mask import GridMask
-
 from torch.nn.functional import interpolate
 
+from mmcv.runner import force_fp32, auto_fp16
+
+from ..builder import build_head, DETECTORS
+from ..grid_mask import GridMask
+
+
+from mmsegBEV.models.detectors.mvx_two_stage import MVXTwoStageDetector
 @DETECTORS.register_module()
 class BEVFormer(MVXTwoStageDetector):
     """BEVFormer.
