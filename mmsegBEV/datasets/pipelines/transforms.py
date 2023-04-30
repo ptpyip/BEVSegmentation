@@ -1,15 +1,15 @@
 from typing import Any, Dict
 from copy import deepcopy
+import warnings
+
+from PIL import Image
 import numpy as np
 from numpy import random
 
 import torch
 import torchvision
 
-from PIL import Image
-
 import mmcv
-from mmcv.parallel import DataContainer as DC
 
 from ..builder import PIPELINES
 from .compose import Compose

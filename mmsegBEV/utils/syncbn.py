@@ -14,3 +14,4 @@ def convert_sync_batchnorm(input_model, exclude=[]):
         input_model._modules[name] = torch.nn.SyncBatchNorm.convert_sync_batchnorm(module)
     return input_model
     
+from mmcv.utils import SyncBatchNorm

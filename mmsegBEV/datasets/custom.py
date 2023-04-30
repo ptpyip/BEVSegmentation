@@ -1,15 +1,17 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+
 import os.path as osp
 import tempfile
+from prettytable import PrettyTable
 from collections import OrderedDict
 
-import mmcv
 import numpy as np
-from mmcv.utils import print_log
-from prettytable import PrettyTable
 from torch.utils.data import Dataset
 
-from mmsegBEV.evaluation import eval_metrics, intersect_and_union, pre_eval_to_metrics
+import mmcv
+from mmcv.utils import print_log
+
+from ..evaluation import eval_metrics, intersect_and_union, pre_eval_to_metrics
 from .builder import DATASETS
 from .pipelines import Compose
 

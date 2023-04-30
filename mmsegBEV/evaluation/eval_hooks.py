@@ -60,10 +60,10 @@ class DistEvalHook(_DistEvalHook):
     """
 
     def _do_evaluate(self, runner):
-        print("Saving Model")
-        torch.save(runner.model.state_dict(), f"{runner.work_dir}/temp_ckpts.pth")
-        runner.save_checkpoint(runner.work_dir)
+        # print("Saving Model")
+        # torch.save(runner.model.state_dict(), f"{runner.work_dir}/temp_ckpts.pth")
+        # runner.save_checkpoint(runner.work_dir)
         
-        print("Doing Evaluation")
+        # print("Doing Evaluation")
         super()._do_evaluate(runner)
   

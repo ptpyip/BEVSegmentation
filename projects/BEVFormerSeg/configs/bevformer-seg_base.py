@@ -11,7 +11,7 @@ plugin_dir = "projects/BEVFormerSeg/models"
 point_cloud_range = [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
 voxel_size = [0.2, 0.2, 8]
 
-
+num_encoder_layer = 4
 
 img_norm_cfg = dict(
     mean=[103.530, 116.280, 123.675], std=[1.0, 1.0, 1.0], to_rgb=False)
@@ -66,8 +66,7 @@ model = dict(
         num_query=900,
         num_classes=10,
         in_channels=_dim_,
-        num_layers=6,
-        # pc_range=point_cloud_range,
+        num_layers=num_encoder_layer,
         num_points_in_pillar=4,
         return_intermediate=False,
         rotate_prev_bev=True,
@@ -105,32 +104,10 @@ model = dict(
         ),
     ),
     decoder_head=dict(
-        type='DetectionTransformerDecoder',
-        num_classes=10,
-        num_layers=6,
-        return_intermediate=True,
-        rotate_prev_bev=True,
-        use_shift=True,
-        use_can_bus=True,
-        embed_dims=_dim_,
-        transformerlayers=dict(
-            type='DetrTransformerDecoderLayer',
-            attn_cfgs=[
-                dict(
-                    type='MultiheadAttention',
-                    embed_dims=_dim_,
-                    num_heads=8,
-                    dropout=0.1),
-                    dict(
-                    type='CustomMSDeformableAttention',
-                    embed_dims=_dim_,
-                    num_levels=1),
-            ],
-            feedforward_channels=_ffn_dim_,
-            ffn_dropout=0.1,
-            operation_order=('self_attn', 'norm', 'cross_attn', 'norm',
-                                'ffn', 'norm')
-        ),
+        type='BEVSegmentationHead',
+        in_channels=_dim_,
+        loss='focal',
+        num_classes=6,
         loss_cls=dict(
             type='FocalLoss',
             use_sigmoid=True,
@@ -157,10 +134,7 @@ model = dict(
         out_size_factor=4,
         assigner=dict(
             type='HungarianAssigner3D',
-            cls_cost=dict(type='FocalLossCost', weight=2.0),
-            reg_cost=dict(type='BBox3DL1Cost', weight=0.25),
-            iou_cost=dict(type='IoUCost', weight=0.0), # Fake cost. This is just to make it compatible with DETR head.
-            pc_range=point_cloud_range))))
+            cls_cost=dict(type='FocalLossCost', weight=2.0),))))
 
 
 optimizer = dict(
@@ -184,7 +158,7 @@ total_epochs = 24
 evaluation = dict(interval=1, pipeline={{_base_.test_pipeline}})
 
 runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
-load_from = 'ckpts/r101_dcn_fcos3d_pretrain.pth'
+# load_from = 'ckpts/r101_dcn_fcos3d_pretrain.pth'
 log_config = dict(
     interval=50,
     hooks=[
