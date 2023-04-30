@@ -232,7 +232,12 @@ class NuScenesDataset(CustomBEVDataset):
                 continue
             return data
 
-    def evaluate(self,results):
+    def evaluate(self,
+                 results,
+                 metric='mIoU',
+                 logger=None,
+                 gt_seg_maps=None,
+                 **kwargs):
         """Evaluation for a single model in nuScenes protocol.
 
         Args:
@@ -246,9 +251,10 @@ class NuScenesDataset(CustomBEVDataset):
         Returns:
             dict: Dictionary of evaluation details.
         """
+        print("dataset.evaluate")
         thresholds = torch.tensor([0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65])
 
-        num_classes = len(self.classes)
+        num_classes = len(self.CLASSES)
         num_thresholds = len(thresholds)
 
         tp = torch.zeros(num_classes, num_thresholds)
