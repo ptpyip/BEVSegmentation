@@ -13,6 +13,7 @@ ckpts/
 # work directories
 work_dirs/
 
+.vscode
 
 
 # C extensions
