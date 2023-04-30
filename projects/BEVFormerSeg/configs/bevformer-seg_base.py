@@ -60,47 +60,52 @@ model = dict(
         num_outs=4,
         relu_before_extra_convs=True),
     bev_encoder=dict(
-        type='BEVFormerEncoder',
+        type="BEVFormer",
+        num_input_levels=4,
         bev_h=bev_h_,
         bev_w=bev_w_,
         num_query=900,
         num_classes=10,
         in_channels=_dim_,
-        num_layers=num_encoder_layer,
-        num_points_in_pillar=4,
         return_intermediate=False,
         rotate_prev_bev=True,
         use_shift=True,
         use_can_bus=True,
-        embed_dims=_dim_,
-        transformerlayers=dict(
-            type='BEVFormerLayer',
-            attn_cfgs=[
-                dict(
-                    type='TemporalSelfAttention',
-                    embed_dims=_dim_,
-                    num_levels=1),
-                dict(
-                    type='SpatialCrossAttention',
-                    pc_range=point_cloud_range,
-                    deformable_attention=dict(
-                        type='MSDeformableAttention3D',
+        sync_cls_avg_factor=True,
+        encoder=dict(
+            type='BEVFormerEncoder',
+            in_channels=_dim_,
+            num_points_in_pillar=4,
+            num_layers=num_encoder_layer,
+            transformerlayers=dict(
+                type='BEVFormerLayer',
+                attn_cfgs=[
+                    dict(
+                        type='TemporalSelfAttention',
                         embed_dims=_dim_,
-                        num_points=8,
-                        num_levels=_num_levels_),
-                    embed_dims=_dim_,
-                )
-            ],
-            feedforward_channels=_ffn_dim_,
-            ffn_dropout=0.1,
-            operation_order=('self_attn', 'norm', 'cross_attn', 'norm',
-                                'ffn', 'norm')
+                        num_levels=1),
+                    dict(
+                        type='SpatialCrossAttention',
+                        pc_range=point_cloud_range,
+                        deformable_attention=dict(
+                            type='MSDeformableAttention3D',
+                            embed_dims=_dim_,
+                            num_points=8,
+                            num_levels=_num_levels_),
+                        embed_dims=_dim_,
+                    )
+                ],
+                feedforward_channels=_ffn_dim_,
+                ffn_dropout=0.1,
+                operation_order=('self_attn', 'norm', 'cross_attn', 'norm',
+                                    'ffn', 'norm')
+            )
         ),
         positional_encoding=dict(
-        type='LearnedPositionalEncoding',
-        num_feats=_pos_dim_,
-        row_num_embed=bev_h_,
-        col_num_embed=bev_w_,
+            type='LearnedPositionalEncoding',
+            num_feats=_pos_dim_,
+            row_num_embed=bev_h_,
+            col_num_embed=bev_w_,
         ),
     ),
     decoder_head=dict(
