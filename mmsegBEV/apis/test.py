@@ -19,7 +19,6 @@ import mmcv
 import numpy as np
 import pycocotools.mask as mask_util
 
-
 from .utils import getDataLoader, loadModel2GPU
 
 def test_model( model, dataset, cfg, distributed=True, format_only=False,timestamp=None):
@@ -100,7 +99,7 @@ def multi_gpu_test(model, data_loader, tmpdir=None, gpu_collect=False, encode_re
                 # encode mask results
                 masks_bev = custom_encode_mask_results(output.get("masks_bev")) if encode_results else output.get("masks_bev")
                 
-                mask_results.extend(masks_bev)
+                results.extend(masks_bev)
             else:
                 # normally take this branch
                 batch_size = len(output)
@@ -112,12 +111,12 @@ def multi_gpu_test(model, data_loader, tmpdir=None, gpu_collect=False, encode_re
 
     # collect results from all ranks
     if gpu_collect:
-        mask_results = collect_results_gpu(mask_results, len(dataset))
+        results = collect_results_gpu(results, len(dataset))
     else:
-        mask_results = collect_results_cpu(mask_results, len(dataset), tmpdir)
+        results = collect_results_cpu(results, len(dataset), tmpdir)
         # tmpdir = tmpdir+'_mask' if tmpdir is not None else None
 
-    return {'mask_results': mask_results}
+    return {'results': results}
 
 
 def collect_results_cpu(result_part, size, tmpdir=None):

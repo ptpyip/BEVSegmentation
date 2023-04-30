@@ -12,7 +12,7 @@ def parse_args():
     parser.add_argument(
         "--root-path",
         type=str,
-        default="./data/kitti",
+        default="./data/nuscenes",
         help="specify the root path of dataset",
     )
     parser.add_argument(
@@ -68,7 +68,7 @@ def nuscenes_data_prep(
         out_dir (str): Output directory of the groundtruth database info.
         max_sweeps (int): Number of input consecutive frames. Default: 10
     """
-    
+    print(f"Version : {version}")
     nuscenes_converter.create_nuscenes_infos(
         dataset_root_path, out_dir, can_bus_root_path, 
         info_prefix, version=version, max_sweeps=max_sweeps
@@ -109,16 +109,16 @@ def main():
             out_dir=args.out_dir,
             max_sweeps=args.max_sweeps,
         )
-        test_version = f"{args.version}-test"
-        nuscenes_data_prep(
-            dataset_root_path=path.join(args.root_path, args.dataset),
-            can_bus_root_path=args.root_path,
-            info_prefix=args.extra_tag,
-            version=train_version,
-            dataset_name="NuScenesDataset",
-            out_dir=args.out_dir,
-            max_sweeps=args.max_sweeps,
-        )
+        # test_version = f"{args.version}-test"
+        # nuscenes_data_prep(
+        #     dataset_root_path=path.join(args.root_path, args.dataset),
+        #     can_bus_root_path=args.root_path,
+        #     info_prefix=args.extra_tag,
+        #     version=test_version,
+        #     dataset_name="NuScenesDataset",
+        #     out_dir=args.out_dir,
+        #     max_sweeps=args.max_sweeps,
+        # )
     elif args.dataset == "nuscenes" and args.version == "v1.0-mini":
         train_version = f"{args.version}"
         nuscenes_data_prep(

@@ -33,17 +33,22 @@ def train_model(
     ):
     logger = get_root_logger()     # get the initialized looger
 
-    ## prepare data loader
+    # prepare data loader
     datasets = datasets if isinstance(datasets, (list, tuple)) else [datasets]
-    dataloader_train = getDataLoader(datasets[0], cfg, distributed)
+    dataloader_train = [getDataLoader(datasets[0], cfg, distributed)]
     dataloader_val = None
-    
+
     if validate:
         val_samples_per_gpu = cfg.data.val.pop('samples_per_gpu', 1)
         dataloader_val = getDataLoader(
             datasets[1], cfg, distributed, samples_per_gpu=val_samples_per_gpu, shuffle=False
         )
-        
+    
+    if isinstance(dataloader_train, list) is not True:
+        print("It is not")
+        print(type(dataloader_train))
+        assert True
+
     # put model on gpus
     model = loadModel2GPU(model, cfg, distributed)
     if eval_model is not None: 
@@ -97,7 +102,19 @@ def train_model(
         runner.resume(cfg.resume_from)
     elif cfg.load_from:
         runner.load_checkpoint(cfg.load_from)       
-        
+    
+    # print("Runner!!")
+    
+    # print(f"Dataloader for train in train.py with {len(dataloader_train[0])}")
+    # for i, data_batch in enumerate(dataloader_train[0]):
+    #     if i10:
+    #         print(f"At {i}")
+    #         for key in data_batch.keys():
+    #             print(key)
+    #         raise NotImplementedError("no")
+    # print(type(runner._hooks[4]))
+    # runner._hooks[4]._do_evaluate(runner)
+    
     runner.run(dataloader_train, cfg.workflow)
 
 # def registerHooks(runner, cfg, distributed=False, val=False):

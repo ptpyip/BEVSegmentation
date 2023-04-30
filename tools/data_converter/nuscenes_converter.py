@@ -10,8 +10,11 @@ from nuscenes.utils.geometry_utils import view_points
 from pyquaternion import Quaternion
 from shapely.geometry import MultiPoint, box
 
-from mmdet3d.core.bbox.box_np_ops import points_cam2img
-from mmdet3d.datasets import NuScenesDataset
+import sys
+sys.path.append('/data/ddoo/projects/bevseg/BEVSegmentation/')
+
+# from mmsegBEV.core.bbox.box_np_ops import points_cam2img
+from mmsegBEV.datasets import NuScenesDataset
 
 nus_categories = (
     "car",
@@ -40,7 +43,8 @@ nus_attributes = (
 
 
 def create_nuscenes_infos(
-    root_path, info_prefix, version="v1.0-trainval", max_sweeps=10
+    root_path, out_path, can_bus_root_path,
+    info_prefix, version="v1.0-trainval", max_sweeps=10
 ):
     """Create info file of nuscene dataset.
 
@@ -55,12 +59,18 @@ def create_nuscenes_infos(
             Default: 10
     """
     from nuscenes.nuscenes import NuScenes
+    from nuscenes.can_bus.can_bus_api import NuScenesCanBus
 
+    print(version, root_path)
     nusc = NuScenes(version=version, dataroot=root_path, verbose=True)
+    nusc = NuScenes(version=version, dataroot=root_path, verbose=True)
+    nusc_can_bus = NuScenesCanBus(dataroot=can_bus_root_path)
+
     from nuscenes.utils import splits
 
     available_vers = ["v1.0-trainval", "v1.0-test", "v1.0-mini"]
     assert version in available_vers
+    
     if version == "v1.0-trainval":
         train_scenes = splits.train
         val_scenes = splits.val
@@ -96,26 +106,23 @@ def create_nuscenes_infos(
             "train scene: {}, val scene: {}".format(len(train_scenes), len(val_scenes))
         )
     train_nusc_infos, val_nusc_infos = _fill_trainval_infos(
-        nusc, train_scenes, val_scenes, test, max_sweeps=max_sweeps
+        nusc, nusc_can_bus, train_scenes, val_scenes, test, max_sweeps=max_sweeps
     )
 
     metadata = dict(version=version)
     if test:
         print("test sample: {}".format(len(train_nusc_infos)))
         data = dict(infos=train_nusc_infos, metadata=metadata)
-        info_path = osp.join(root_path, "{}_infos_test.pkl".format(info_prefix))
+        info_path = osp.join(out_path,'{}_infos_temporal_test.pkl'.format(info_prefix))
         mmcv.dump(data, info_path)
     else:
-        print(
-            "train sample: {}, val sample: {}".format(
-                len(train_nusc_infos), len(val_nusc_infos)
-            )
-        )
+        print('train sample: {}, val sample: {}'.format(
+            len(train_nusc_infos), len(val_nusc_infos)))
         data = dict(infos=train_nusc_infos, metadata=metadata)
-        info_path = osp.join(root_path, "{}_infos_train.pkl".format(info_prefix))
+        info_path = osp.join(out_path,'{}_infos_temporal_train.pkl'.format(info_prefix))
         mmcv.dump(data, info_path)
-        data["infos"] = val_nusc_infos
-        info_val_path = osp.join(root_path, "{}_infos_val.pkl".format(info_prefix))
+        data['infos'] = val_nusc_infos
+        info_val_path = osp.join(out_path,'{}_infos_temporal_val.pkl'.format(info_prefix))
         mmcv.dump(data, info_val_path)
 
 
@@ -159,8 +166,36 @@ def get_available_scenes(nusc):
     print("exist scene num: {}".format(len(available_scenes)))
     return available_scenes
 
+def _get_can_bus_info(nusc, nusc_can_bus, sample):
+    scene_name = nusc.get('scene', sample['scene_token'])['name']
+    sample_timestamp = sample['timestamp']
+    try:
+        pose_list = nusc_can_bus.get_messages(scene_name, 'pose')
+    except:
+        return np.zeros(18)  # server scenes do not have can bus information.
+    can_bus = []
+    # during each scene, the first timestamp of can_bus may be large than the first sample's timestamp
+    last_pose = pose_list[0]
+    for i, pose in enumerate(pose_list):
+        if pose['utime'] > sample_timestamp:
+            break
+        last_pose = pose
+    _ = last_pose.pop('utime')  # useless
+    pos = last_pose.pop('pos')
+    rotation = last_pose.pop('orientation')
+    can_bus.extend(pos)
+    can_bus.extend(rotation)
+    for key in last_pose.keys():
+        can_bus.extend(pose[key])  # 16 elements
+    can_bus.extend([0., 0.])
+    return np.array(can_bus)
 
-def _fill_trainval_infos(nusc, train_scenes, val_scenes, test=False, max_sweeps=10):
+def _fill_trainval_infos(nusc, 
+                         nusc_can_bus,
+                         train_scenes, 
+                         val_scenes, 
+                         test=False, 
+                         max_sweeps=10):
     """Generate the train/val infos from the raw data.
 
     Args:
@@ -177,6 +212,7 @@ def _fill_trainval_infos(nusc, train_scenes, val_scenes, test=False, max_sweeps=
     """
     train_nusc_infos = []
     val_nusc_infos = []
+    frame_idx = 0
 
     for sample in mmcv.track_iter_progress(nusc.sample):
         lidar_token = sample["data"]["LIDAR_TOP"]
@@ -189,19 +225,30 @@ def _fill_trainval_infos(nusc, train_scenes, val_scenes, test=False, max_sweeps=
         lidar_path, boxes, _ = nusc.get_sample_data(lidar_token)
 
         mmcv.check_file_exist(lidar_path)
+        can_bus = _get_can_bus_info(nusc, nusc_can_bus, sample)
 
         info = {
-            "lidar_path": lidar_path,
-            "token": sample["token"],
-            "sweeps": [],
-            "cams": dict(),
-            "lidar2ego_translation": cs_record["translation"],
-            "lidar2ego_rotation": cs_record["rotation"],
-            "ego2global_translation": pose_record["translation"],
-            "ego2global_rotation": pose_record["rotation"],
-            "timestamp": sample["timestamp"],
+            'lidar_path': lidar_path,
+            'token': sample['token'],
+            'prev': sample['prev'],
+            'next': sample['next'],
+            'can_bus': can_bus,
+            'frame_idx': frame_idx,  # temporal related info
+            'sweeps': [],
+            'cams': dict(),
+            'scene_token': sample['scene_token'],  # temporal related info
+            'lidar2ego_translation': cs_record['translation'],
+            'lidar2ego_rotation': cs_record['rotation'],
+            'ego2global_translation': pose_record['translation'],
+            'ego2global_rotation': pose_record['rotation'],
+            'timestamp': sample['timestamp'],
             "location": location,
         }
+
+        if sample['next'] == '':
+            frame_idx = 0
+        else:
+            frame_idx += 1
 
         l2e_r = info["lidar2ego_rotation"]
         l2e_t = info["lidar2ego_translation"]
@@ -248,12 +295,8 @@ def _fill_trainval_infos(nusc, train_scenes, val_scenes, test=False, max_sweeps=
             ]
             locs = np.array([b.center for b in boxes]).reshape(-1, 3)
             dims = np.array([b.wlh for b in boxes]).reshape(-1, 3)
-            rots = np.array([b.orientation.yaw_pitch_roll[0] for b in boxes]).reshape(
-                -1, 1
-            )
-            velocity = np.array(
-                [nusc.box_velocity(token)[:2] for token in sample["anns"]]
-            )
+            rots = np.array([b.orientation.yaw_pitch_roll[0] for b in boxes]).reshape(-1, 1)
+            velocity = np.array([nusc.box_velocity(token)[:2] for token in sample["anns"]])
             valid_flag = np.array(
                 [
                     (anno["num_lidar_pts"] + anno["num_radar_pts"]) > 0
@@ -382,12 +425,12 @@ def export_2d_annotation(root_path, info_path, version, mono3d=True):
     for info in mmcv.track_iter_progress(nusc_infos):
         for cam in camera_types:
             cam_info = info["cams"][cam]
-            coco_infos = get_2d_boxes(
-                nusc,
-                cam_info["sample_data_token"],
-                visibilities=["", "1", "2", "3", "4"],
-                mono3d=mono3d,
-            )
+            # coco_infos = get_2d_boxes(
+            #     nusc,
+            #     cam_info["sample_data_token"],
+            #     visibilities=["", "1", "2", "3", "4"],
+            #     mono3d=mono3d,
+            # )
             (height, width, _) = mmcv.imread(cam_info["data_path"]).shape
             coco_2d_dict["images"].append(
                 dict(
@@ -403,14 +446,14 @@ def export_2d_annotation(root_path, info_path, version, mono3d=True):
                     height=height,
                 )
             )
-            for coco_info in coco_infos:
-                if coco_info is None:
-                    continue
-                # add an empty key for coco format
-                coco_info["segmentation"] = []
-                coco_info["id"] = coco_ann_id
-                coco_2d_dict["annotations"].append(coco_info)
-                coco_ann_id += 1
+            # for coco_info in coco_infos:
+            #     if coco_info is None:
+            #         continue
+            #     # add an empty key for coco format
+            #     coco_info["segmentation"] = []
+            #     coco_info["id"] = coco_ann_id
+            #     coco_2d_dict["annotations"].append(coco_info)
+            #     coco_ann_id += 1
     if mono3d:
         json_prefix = f"{info_path[:-4]}_mono3d"
     else:

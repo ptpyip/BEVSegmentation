@@ -5,23 +5,53 @@ import numpy as np
 import torch
 
 from nuscenes.eval.common.utils import quaternion_yaw, Quaternion
+import tempfile
+from nuscenes.utils.data_classes import Box as NuScenesBox
+from os import path as osp
 
 from mmcv.parallel import DataContainer
 
 from .builder import DATASETS
 from .custom import CustomBEVDataset
 
+# from mmdet.datasets import DATASETS
+# from ..core import show_result
+# from ..core.bbox import Box3DMode, Coord3DMode, LiDARInstance3DBoxes
+from .custom import CustomBEVDataset
+from .pipelines import Compose
+
 
 @DATASETS.register_module()
 class NuScenesDataset(CustomBEVDataset):
-    r"""NuScenes Dataset.
-
-    This datset only add camera intrinsics and extrinsics to the results.
     """
+    NuScenes Dataset.
+    """
+    NameMapping = {
+        'movable_object.barrier': 'barrier',
+        'vehicle.bicycle': 'bicycle',
+        'vehicle.bus.bendy': 'bus',
+        'vehicle.bus.rigid': 'bus',
+        'vehicle.car': 'car',
+        'vehicle.construction': 'construction_vehicle',
+        'vehicle.motorcycle': 'motorcycle',
+        'human.pedestrian.adult': 'pedestrian',
+        'human.pedestrian.child': 'pedestrian',
+        'human.pedestrian.construction_worker': 'pedestrian',
+        'human.pedestrian.police_officer': 'pedestrian',
+        'movable_object.trafficcone': 'traffic_cone',
+        'vehicle.trailer': 'trailer',
+        'vehicle.truck': 'truck'
+    }
+    
+    CLASSES = ('car', 'truck', 'trailer', 'bus', 'construction_vehicle',
+               'bicycle', 'motorcycle', 'pedestrian', 'traffic_cone',
+               'barrier')
 
-    def __init__(self, queue_length=4, bev_size=(200, 200), overlap_test=False, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.frames_queue = queue_length
+    def __init__(self, data_root=None, 
+                 queue_length=4, bev_size=(200, 200), 
+                 overlap_test=False, load_interval=1, *args, **kwargs):
+        super().__init__(dataset_root=data_root, *args, **kwargs)
+        self.queue_length = queue_length
         self.overlap_test = overlap_test
         self.bev_size = bev_size
         
@@ -45,20 +75,16 @@ class NuScenesDataset(CustomBEVDataset):
                 return None
             self.pre_pipeline(data)
             example = self.pipeline(data)
-            if self.filter_empty_gt and \
-                    (example is None or ~(example.get("gt_labels_3d")._data != -1).any()):
-                return None
             queue.append(example)
         return self.union2one(queue)
 
-
     def union2one(self, queue):
-        data_sample = queue = queue[-1]
+        data_sample = queue[-1]
         meta_maps = []
         prev_scene_token, prev_pos, prev_angle = None
         
         frames = [frame['img'].data for frame in queue]
-        for i, frame in enumerate(queue):
+        for frame in queue:
             meta_map = frame['img_metas'].data
             meta_map['prev_bev_exists'] = (meta_map['scene_token'] == prev_scene_token)
             
@@ -81,11 +107,42 @@ class NuScenesDataset(CustomBEVDataset):
                 meta_map['can_bus'][:3] = 0
                 meta_map['can_bus'][-1] = 0
                 
-            meta_maps[i] = meta_map
+            meta_maps.append(meta_map)
             
         data_sample['img'] = DataContainer(torch.stack(frames), cpu_only=False, stack=True)
         data_sample['img_metas'] = DataContainer(meta_maps, cpu_only=True)
         return data_sample
+
+        # imgs_list = [each['img'].data for each in queue]
+        # metas_map = {}
+        # prev_scene_token = None
+        # prev_pos = None
+        # prev_angle = None
+        # for i, each in enumerate(queue):
+        #     metas_map[i] = each['img_metas'].data
+        #     if metas_map[i]['scene_token'] != prev_scene_token:
+        #         metas_map[i]['prev_bev_exists'] = False
+        #         prev_scene_token = metas_map[i]['scene_token']
+        #         prev_pos = copy.deepcopy(metas_map[i]['can_bus'][:3])
+        #         prev_angle = copy.deepcopy(metas_map[i]['can_bus'][-1])
+        #         metas_map[i]['can_bus'][:3] = 0
+        #         metas_map[i]['can_bus'][-1] = 0
+        #     else:
+        #         metas_map[i]['prev_bev_exists'] = True
+        #         tmp_pos = copy.deepcopy(metas_map[i]['can_bus'][:3])
+        #         tmp_angle = copy.deepcopy(metas_map[i]['can_bus'][-1])
+        #         metas_map[i]['can_bus'][:3] -= prev_pos
+        #         metas_map[i]['can_bus'][-1] -= prev_angle
+        #         prev_pos = copy.deepcopy(tmp_pos)
+        #         prev_angle = copy.deepcopy(tmp_angle)
+        # queue[-1]['img'] = DataContainer(torch.stack(imgs_list), cpu_only=False, stack=True)
+        # queue[-1]['img_metas'] = DataContainer(metas_map, cpu_only=True)
+        # queue = queue[-1]
+
+        # # for key in queue.keys():
+        # #     print(key)
+
+        # return queue
 
     def get_data_info(self, index):
         """Get data info according to the given index.
@@ -108,59 +165,82 @@ class NuScenesDataset(CustomBEVDataset):
         """
         info = self.data_infos[index]
         
+        if info is None:
+            print("info is none")
+            assert True
+
         # standard protocal modified from SECOND.Pytorch
-        data = dict(
+        input_dict = dict(
+            token=info["token"],
             sample_idx=info['token'],
-            location=info["location"],
-            ego2global_translation=info['ego2global_translation'],
-            ego2global_rotation=info['ego2global_rotation'],
+            lidar_path=info["lidar_path"],
+            sweeps=info["sweeps"],
             prev_idx=info['prev'],
             next_idx=info['next'],
             scene_token=info['scene_token'],
             can_bus=info['can_bus'],
             frame_idx=info['frame_idx'],
             timestamp=info['timestamp'] / 1e6,
+            location=info["location"],
         )
 
+        # ego to global transform
+        ego2global = np.eye(4).astype(np.float32)
+        ego2global[:3, :3] = Quaternion(info["ego2global_rotation"]).rotation_matrix
+        ego2global[:3, 3] = info["ego2global_translation"]
+        input_dict["ego2global"] = ego2global
+
+        # lidar to ego transform
+        lidar2ego = np.eye(4).astype(np.float32)
+        lidar2ego[:3, :3] = Quaternion(info["lidar2ego_rotation"]).rotation_matrix
+        lidar2ego[:3, 3] = info["lidar2ego_translation"]
+        input_dict["lidar2ego"] = lidar2ego
+
         if self.modality['use_camera']:
-            image_paths = []
-            lidar2img_rts = []
-            lidar2cam_rts = []
-            cam_intrinsics = []
+            input_dict["image_paths"] = []
+            input_dict["lidar2camera"] = []
+            input_dict["lidar2image"] = []
+            input_dict["camera2ego"] = []
+            input_dict["camera_intrinsics"] = []
+            input_dict["camera2lidar"] = []
             
-            for cam_type, cam_info in info['cams'].items():
-                image_paths.append(cam_info['data_path'])
-                # obtain lidar to image transformation matrix
-                lidar2cam_r = np.linalg.inv(cam_info['sensor2lidar_rotation'])
-                lidar2cam_t = cam_info[
-                    'sensor2lidar_translation'] @ lidar2cam_r.T
-                lidar2cam_rt = np.eye(4)
-                lidar2cam_rt[:3, :3] = lidar2cam_r.T
-                lidar2cam_rt[3, :3] = -lidar2cam_t
-                intrinsic = cam_info['cam_intrinsic']
-                viewpad = np.eye(4)
-                viewpad[:intrinsic.shape[0], :intrinsic.shape[1]] = intrinsic
-                lidar2img_rt = (viewpad @ lidar2cam_rt.T)
-                lidar2img_rts.append(lidar2img_rt)
+            for _, camera_info in info["cams"].items():
+                input_dict["image_paths"].append(camera_info["data_path"])
 
-                cam_intrinsics.append(viewpad)
-                lidar2cam_rts.append(lidar2cam_rt.T)
+                # lidar to camera transform
+                lidar2camera_r = np.linalg.inv(camera_info["sensor2lidar_rotation"])
+                lidar2camera_t = (
+                    camera_info["sensor2lidar_translation"] @ lidar2camera_r.T
+                )
+                lidar2camera_rt = np.eye(4).astype(np.float32)
+                lidar2camera_rt[:3, :3] = lidar2camera_r.T
+                lidar2camera_rt[3, :3] = -lidar2camera_t
+                input_dict["lidar2camera"].append(lidar2camera_rt.T)
 
-            data.update(
-                dict(
-                    img_filename=image_paths,
-                    lidar2img=lidar2img_rts,
-                    cam_intrinsic=cam_intrinsics,
-                    lidar2cam=lidar2cam_rts,
-                ))
+                # camera intrinsics
+                camera_intrinsics = np.eye(4).astype(np.float32)
+                camera_intrinsics[:3, :3] = camera_info["camera_intrinsics"]
+                input_dict["camera_intrinsics"].append(camera_intrinsics)
 
-        if not self.test_mode:
-            annos = self.get_ann_info(index)
-            data['ann_info'] = annos
+                # lidar to image transform
+                lidar2image = camera_intrinsics @ lidar2camera_rt.T
+                input_dict["lidar2image"].append(lidar2image)
 
-        rotation = Quaternion(data['ego2global_rotation'])
-        translation = data['ego2global_translation']
-        can_bus = data['can_bus']
+                # camera to ego transform
+                camera2ego = np.eye(4).astype(np.float32)
+                camera2ego[:3, :3] = Quaternion(camera_info["sensor2ego_rotation"]).rotation_matrix
+                camera2ego[:3, 3] = camera_info["sensor2ego_translation"]
+                input_dict["camera2ego"].append(camera2ego)
+
+                # camera to lidar transform
+                camera2lidar = np.eye(4).astype(np.float32)
+                camera2lidar[:3, :3] = camera_info["sensor2lidar_rotation"]
+                camera2lidar[:3, 3] = camera_info["sensor2lidar_translation"]
+                input_dict["camera2lidar"].append(camera2lidar)
+
+        rotation = Quaternion(info["ego2global_rotation"])
+        translation = info["ego2global_translation"]
+        can_bus = input_dict['can_bus']
         can_bus[:3] = translation
         can_bus[3:7] = rotation
         patch_angle = quaternion_yaw(rotation) / np.pi * 180
@@ -169,7 +249,7 @@ class NuScenesDataset(CustomBEVDataset):
         can_bus[-2] = patch_angle / 180 * np.pi
         can_bus[-1] = patch_angle
 
-        return data
+        return input_dict
 
     def __getitem__(self, idx):
         """Get item from infos according to the given index.
@@ -179,14 +259,18 @@ class NuScenesDataset(CustomBEVDataset):
         if self.test_mode:
             return self.prepare_test_data(idx)
         while True:
-
             data = self.prepare_train_data(idx)
             if data is None:
                 idx = self._rand_another(idx)
                 continue
             return data
 
-    def evaluate(self, results, **eval_kwargs):
+    def evaluate(self,
+                 results,
+                 metric='mIoU',
+                 logger=None,
+                 gt_seg_maps=None,
+                 **kwargs):
         """Evaluation for a single model in nuScenes protocol.
 
         Args:
@@ -200,9 +284,10 @@ class NuScenesDataset(CustomBEVDataset):
         Returns:
             dict: Dictionary of evaluation details.
         """
+        print("dataset.evaluate")
         thresholds = torch.tensor([0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65])
 
-        num_classes = len(self.classes)
+        num_classes = len(self.CLASSES)
         num_thresholds = len(thresholds)
 
         tp = torch.zeros(num_classes, num_thresholds)

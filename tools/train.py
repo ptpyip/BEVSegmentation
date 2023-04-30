@@ -3,14 +3,15 @@ import time
 
 import argparse
 
-from mmseg.models import build_model
-from mmseg.apis import set_random_seed, train_model
+from mmsegBEV.models import build_model
+from mmsegBEV.apis import train_model
+from mmsegBEV.datasets import build_dataset
+
+from mmdet.apis import set_random_seed
 from mmseg import __version__ as mmseg_version
 
-from mmsegBEV.apis import train_model
-from mmseg.datasets import build_dataset
-
 import utils
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
@@ -22,10 +23,19 @@ def parse_args():
         default='none',
         help='job launcher'
     )
-    
+    parser.add_argument('--local_rank', type=int, default=0)
+
+    # parser.add_argument('--seed', type=int, default=0, help='random seed')
+    # parser.add_argument(
+    #     '--deterministic',
+    #     action='store_true',
+    #     help='whether to set deterministic options for CUDNN backend.')
+        
     return parser.parse_args()
    
 def main():
+    print("Train start!!!")
+
     meta = {'timestamp': time.strftime('%Y%m%d_%H%M%S', time.localtime())}
     
     args = parse_args()
@@ -69,9 +79,13 @@ def main():
             CLASSES=model.CLASSES,
             PALETTE=model.PALETTE
         )
-        
+
     train_model(
         model, datasets, cfg,
         distributed=True, validate=True,
         timestamp=meta["timestamp"]
     )
+
+
+if __name__ == '__main__':
+    main()

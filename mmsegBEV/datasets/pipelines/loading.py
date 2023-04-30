@@ -8,6 +8,7 @@ from nuscenes.map_expansion.map_api import locations as LOCATIONS
 from PIL import Image
 
 from ..builder import PIPELINES
+# from mmdet.datasets import PIPELINES
 
 
 @PIPELINES.register_module()
@@ -45,24 +46,21 @@ class LoadMultiViewImageFromFiles:
                 - img_norm_cfg (dict): Normalization configuration of images.
         """
         filename = results["image_paths"]
-        # img is of shape (h, w, c, num_views)
-        # modified for waymo
-        images = []
-        h, w = 0, 0
-        for name in filename:
-            images.append(Image.open(name))
         
-        #TODO: consider image padding in waymo
-
-        results["filename"] = filename
+        # img is of shape (h, w, c, num_views)
+        img = np.stack([mmcv.imread(name, self.color_type) for name in filename], axis=-1)
+        if self.to_float32:
+            img = img.astype(np.float32)
+        
+        results['filename'] = filename
         # unravel to list, see `DefaultFormatBundle` in formating.py
         # which will transpose each image separately and then stack into array
-        results["img"] = images
+        results["img"] = [img[..., i] for i in range(img.shape[-1])]
         # [1600, 900]
-        results["img_shape"] = images[0].size
-        results["ori_shape"] = images[0].size
+        results["img_shape"] = img.shape #images[0].size
+        results["ori_shape"] = img.shape #images[0].size
         # Set initial values for default meta_keys
-        results["pad_shape"] = images[0].size
+        results["pad_shape"] = img.shape #images[0].size
         results["scale_factor"] = 1.0
         
         return results
@@ -144,5 +142,6 @@ class LoadBEVSegmentation:
                 labels[k, masks[index]] = 1
 
         data["gt_masks_bev"] = labels
+        
         return data
 
