@@ -2,7 +2,6 @@
 from mmseg.apis import train_segmentor
 from mmdet.apis import train_detector
 
-
 import numpy as np
 import torch
 import torch.distributed as dist
@@ -12,7 +11,7 @@ from mmcv.runner import (HOOKS, DistSamplerSeedHook, EpochBasedRunner,
                          build_runner, get_dist_info)
 from mmcv.utils import build_from_cfg
 
-from mmdet.core import EvalHook
+# from mmdet.core import EvalHook
 
 from mmdet.datasets import (build_dataset,
                             replace_ImageToTensor)
@@ -22,7 +21,9 @@ from os import path
 
 from mmsegBEV.datasets import build_dataloader
 from mmsegBEV.utils import get_root_logger
-from mmsegBEV.evaluation import CustomDistEvalHook
+from mmsegBEV.evaluation import DistEvalHook, EvalHook
+
+from .test import multi_gpu_test, single_gpu_test
 
 def train_model(
         model,
@@ -36,17 +37,22 @@ def train_model(
     ):
     logger = get_root_logger()     # get the initialized looger
 
-    ## prepare data loader
+    # prepare data loader
     datasets = datasets if isinstance(datasets, (list, tuple)) else [datasets]
-    dataloader_train = getDataLoader(datasets[0], cfg, distributed)
+    dataloader_train = [getDataLoader(datasets[0], cfg, distributed)]
     dataloader_val = None
-    
+
     if validate:
         val_samples_per_gpu = cfg.data.val.pop('samples_per_gpu', 1)
         dataloader_val = getDataLoader(
             datasets[1], cfg, distributed, samples_per_gpu=val_samples_per_gpu, shuffle=False
         )
-        
+    
+    if isinstance(dataloader_train, list) is not True:
+        print("It is not")
+        print(type(dataloader_train))
+        assert True
+
     # put model on gpus
     model = loadModel2GPU(model, cfg, distributed)
     if eval_model is not None: 
@@ -100,7 +106,19 @@ def train_model(
         runner.resume(cfg.resume_from)
     elif cfg.load_from:
         runner.load_checkpoint(cfg.load_from)       
-        
+    
+    # print("Runner!!")
+    
+    # print(f"Dataloader for train in train.py with {len(dataloader_train[0])}")
+    # for i, data_batch in enumerate(dataloader_train[0]):
+    #     if i10:
+    #         print(f"At {i}")
+    #         for key in data_batch.keys():
+    #             print(key)
+    #         raise NotImplementedError("no")
+    # print(type(runner._hooks[4]))
+    # runner._hooks[4]._do_evaluate(runner)
+    
     runner.run(dataloader_train, cfg.workflow)
     
 def getDataLoader(dataset, cfg, distributed=False, samples_per_gpu=None, shuffle=None):
@@ -166,26 +184,31 @@ def registerValHooks(runner, dataloader_val, cfg, distributed=False):
     eval_cfg = cfg.get('evaluation', {})
     eval_cfg['by_epoch'] = cfg.runner['type'] != 'IterBasedRunner'
     eval_cfg['jsonfile_prefix'] = path.join('val', cfg.work_dir, time.ctime().replace(' ','_').replace(':','_'))
-    eval_hook = CustomDistEvalHook if distributed else EvalHook
-    runner.register_hook(eval_hook(dataloader_val, **eval_cfg))
+    
+    if distributed:
+        eval_hook = DistEvalHook(dataloader_val, test_fn=multi_gpu_test, **eval_cfg)
+    else:
+        eval_hook = EvalHook(dataloader_val, test_fn=single_gpu_test, **eval_cfg)
+    
+    runner.register_hook(eval_hook)
 
-def train_model(model,
-                dataset,
-                cfg,
-                distributed=False,
-                validate=False,
-                timestamp=None,
-                meta=None):
-    """A function wrapper for launching model training according to cfg.
+# def train_model(model,
+#                 dataset,
+#                 cfg,
+#                 distributed=False,
+#                 validate=False,
+#                 timestamp=None,
+#                 meta=None):
+#     """A function wrapper for launching model training according to cfg.
 
-    Because we need different eval_hook in runner. Should be deprecated in the
-    future.
-    """
-    train_segmentor(
-        model,
-        dataset,
-        cfg,
-        distributed=distributed,
-        validate=validate,
-        timestamp=timestamp,
-        meta=meta)
+#     Because we need different eval_hook in runner. Should be deprecated in the
+#     future.
+#     """
+#     train_segmentor(
+#         model,
+#         dataset,
+#         cfg,
+#         distributed=distributed,
+#         validate=validate,
+#         timestamp=timestamp,
+#         meta=meta)

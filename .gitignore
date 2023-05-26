@@ -3,6 +3,19 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# datasets
+data/
+data
+
+# checkpoints
+ckpts/
+
+# work directories
+work_dirs/
+
+.vscode
+
+
 # C extensions
 *.so
 
