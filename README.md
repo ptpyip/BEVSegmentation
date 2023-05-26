@@ -1,5 +1,6 @@
 # COMP4901V Final Project
 This is the github page for the final project COMP4901V.
+For grading, please go to `bev` branch.
 
 # Our works:
  1. Add the segmentation head based on the official BEVSegmentation code 
