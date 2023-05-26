@@ -1,5 +1,5 @@
 dataset_type = "NuScenesDataset"
-data_root = 'data/nuscenes/'
+data_root = '/data/ddoo_share/BEVSegmentation/data/nuscenes/'
 file_client_args = dict(backend='disk')
 
 point_cloud_range = [-50, -50, -5, 50, 50, 3]
@@ -21,9 +21,9 @@ input_modality = dict(
     use_map=False,
     use_external=True)
 
-image_size = [256, 704]
-bev_h_ = 50
-bev_w_ = 50
+# image_size = [256, 704]
+bev_h_ = 100
+bev_w_ = 100
 queue_length = 2 # each sequence contains `queue_length` frames.
 
 # If point cloud range is changed, the models should also change their point
@@ -56,6 +56,7 @@ augment2d = dict(
 )
 
 train_pipeline = [
+    dict(type='ImageAug'),
     dict(type='LoadMultiViewImageFromFiles', to_float32=True),
     dict(type='PhotoMetricDistortionMultiViewImage'),
     dict(
@@ -122,12 +123,12 @@ MAP_PALETTE = {
 }
 
 data = dict(
-    samples_per_gpu=1,
+    samples_per_gpu=2,
     workers_per_gpu=4,
     train=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file='data/nuscenes_infos_temporal_train.pkl',
+        ann_file='/data/ddoo_share/BEVSegmentation/data/nuscenes_infos_temporal_train.pkl',
         pipeline=train_pipeline,
         classes=class_names,
         palette=MAP_PALETTE,
@@ -140,7 +141,7 @@ data = dict(
         type=dataset_type,
         data_root=data_root,
         test_mode=True,
-        ann_file='data/nuscenes_infos_temporal_val.pkl',
+        ann_file='/data/ddoo_share/BEVSegmentation/data/nuscenes_infos_temporal_val.pkl',
         pipeline=test_pipeline,  
         bev_size=(bev_h_, bev_w_),
         classes=class_names, 
@@ -150,7 +151,7 @@ data = dict(
     test=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'nuscenes_infos_temporal_val.pkl',
+        ann_file='/data/ddoo_share/BEVSegmentation/data/nuscenes_infos_temporal_val.pkl',
               pipeline=test_pipeline, bev_size=(bev_h_, bev_w_),
               classes=class_names, modality=input_modality),
     shuffle=True,

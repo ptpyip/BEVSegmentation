@@ -17,7 +17,7 @@ from .compose import Compose
 @PIPELINES.register_module()
 class ImageAug:
     def __init__(
-        self, final_dim, resize_lim, bot_pct_lim, rot_lim, rand_flip, is_train
+        self, final_dim, resize_lim, bot_pct_lim, rot_lim=[0,0,0], rand_flip=False, is_train=True
     ):
         self.final_dim = final_dim
         self.resize_lim = resize_lim
@@ -31,7 +31,7 @@ class ImageAug:
         fH, fW = self.final_dim
         if self.is_train:
             resize = np.random.uniform(*self.resize_lim)
-            resize_dims = (int(W * resize), int(H * resize))
+            resize_dims = (int(W * 0.4), int(H * 0.4))
             newW, newH = resize_dims
             crop_h = int((1 - np.random.uniform(*self.bot_pct_lim)) * newH) - fH
             crop_w = int(np.random.uniform(0, max(0, newW - fW)))

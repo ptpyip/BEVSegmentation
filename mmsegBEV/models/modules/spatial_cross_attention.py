@@ -51,7 +51,7 @@ class SpatialCrossAttention(BaseModule):
                  deformable_attention=dict(
                      type='MSDeformableAttention3D',
                      embed_dims=256,
-                     num_levels=4),
+                     num_levels=2),
                  **kwargs
                  ):
         super(SpatialCrossAttention, self).__init__(init_cfg)
@@ -134,8 +134,7 @@ class SpatialCrossAttention(BaseModule):
 
         # print("bev mask in spatial cross attention")
         # print(bev_mask.shape)
-
-        bev_mask = bev_mask[:3, :, :, :]
+        # bev_mask = bev_mask[:3, :, :, :]
 
         D = reference_points_cam.size(3)
         indexes = []
@@ -152,7 +151,8 @@ class SpatialCrossAttention(BaseModule):
         
         # print("reference points cam in spatial cross attention")
         # print(reference_points_cam.shape)
-        reference_points_cam = reference_points_cam[0:3, :, :, :, :]
+        # reference_points_cam = reference_points_cam[0:3, :, :, :, :]
+        
         for j in range(bs):
             for i, reference_points_per_img in enumerate(reference_points_cam):   
                 index_query_per_img = indexes[i]
@@ -388,7 +388,6 @@ class MSDeformableAttention3D(BaseModule):
 
         #  sampling_locations.shape: bs, num_query, num_heads, num_levels, num_all_points, 2
         #  attention_weights.shape: bs, num_query, num_heads, num_levels, num_all_points
-        #
 
         if torch.cuda.is_available() and value.is_cuda:
             if value.dtype == torch.float16:

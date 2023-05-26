@@ -75,10 +75,8 @@ class BEVFormerEncoder(TransformerLayerSequence):
         # reference points on 2D bev plane, used in temporal self-attention (TSA).
         elif dim == '2d':
             ref_y, ref_x = torch.meshgrid(
-                torch.linspace(
-                    0.5, H - 0.5, H, dtype=dtype, device=device),
-                torch.linspace(
-                    0.5, W - 0.5, W, dtype=dtype, device=device)
+                torch.linspace(0.5, H - 0.5, H, dtype=dtype, device=device),
+                torch.linspace(0.5, W - 0.5, W, dtype=dtype, device=device)
             )
             ref_y = ref_y.reshape(-1)[None] / H
             ref_x = ref_x.reshape(-1)[None] / W
@@ -91,10 +89,9 @@ class BEVFormerEncoder(TransformerLayerSequence):
     def point_sampling(self, reference_points, pc_range,  img_metas):
 
         lidar2img = []
-        # print("from point sampling")
         for img_meta in img_metas:
-            # print(img_meta)
             lidar2img.append(img_meta['lidar2image'])
+            
         lidar2img = np.asarray(lidar2img)
         lidar2img = reference_points.new_tensor(lidar2img)  # (B, N, 4, 4)
         reference_points = reference_points.clone()

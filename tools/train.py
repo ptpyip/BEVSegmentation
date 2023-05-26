@@ -9,9 +9,10 @@ from mmsegBEV.datasets import build_dataset
 
 from mmdet.apis import set_random_seed
 from mmseg import __version__ as mmseg_version
+import warnings
+warnings.simplefilter(action='ignore', category=UserWarning)
 
 import utils
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')

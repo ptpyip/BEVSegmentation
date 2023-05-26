@@ -2,7 +2,6 @@
 from mmseg.apis import train_segmentor
 from mmdet.apis import train_detector
 
-
 import numpy as np
 import torch
 import torch.distributed as dist

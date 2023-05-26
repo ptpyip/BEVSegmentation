@@ -14,8 +14,8 @@ _dim_ = 256
 _pos_dim_ = _dim_//2
 _ffn_dim_ = _dim_*2
 _num_levels_ = 4
-bev_h_ = 200
-bev_w_ = 200
+bev_h_ = 100
+bev_w_ = 100
 queue_length = 2 # each sequence contains `queue_length` frames.
 
 point_cloud_range = [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
@@ -36,7 +36,7 @@ model = dict(
         style='pytorch',
         dcn=dict(type='DCNv2', deform_groups=1, fallback_on_stride=False), # original DCNv2 will print log when perform load_state_dict
         stage_with_dcn=(False, False, True, True),
-        init_cfg = dict(type='Pretrained', checkpoint='ckpts/resnet101-5d3b4d8f.pth'),
+        # init_cfg = dict(type='Pretrained', checkpoint='ckpts/resnet101-5d3b4d8f.pth'),
     ),
     img_neck=dict(
         type='FPN',
@@ -45,7 +45,7 @@ model = dict(
         start_level=0,
         add_extra_convs='on_output',
         num_outs=4,
-        relu_before_extra_convs=True
+        relu_before_extra_convs=True,
     ),
     seg_head=dict(
         type='BEVSegmentationHead',
@@ -60,10 +60,10 @@ model = dict(
             rotate_prev_bev=True,
             use_shift=True,
             use_can_bus=True,
-            embed_dims=256,
+            embed_dims=_dim_,
             encoder=dict(
                 type='BEVFormerEncoder',
-                num_layers=6,
+                num_layers=_num_levels_,
                 pc_range=[-51.2, -51.2, -5.0, 51.2, 51.2, 3.0],
                 num_points_in_pillar=4,
                 return_intermediate=False,
@@ -72,7 +72,7 @@ model = dict(
                     attn_cfgs=[
                         dict(
                             type='TemporalSelfAttention',
-                            embed_dims=256,
+                            embed_dims=_dim_,
                             num_levels=1
                         ),
                         dict(
@@ -80,39 +80,40 @@ model = dict(
                             pc_range=[-51.2, -51.2, -5.0, 51.2, 51.2, 3.0],
                             deformable_attention=dict( 
                                         type='MSDeformableAttention3D', 
-                                        embed_dims=256, num_points=8, num_levels=4),
-                            embed_dims=256
+                                        embed_dims=_dim_, 
+                                        num_points=8, 
+                                        num_levels=_num_levels_
+                            ),
+                            embed_dims=_dim_
                         )
                     ],
                     feedforward_channels=512,
                     ffn_dropout=0.1,
-                    operation_order=('self_attn', 'norm', 'cross_attn', 'norm',
-                                     'ffn', 'norm')
+                    operation_order=('self_attn', 'norm', 'cross_attn', 'norm','ffn', 'norm')
                 )
             ),
-            # decoder=dict(
-            #     type='DetectionTransformerDecoder',
-            #     num_layers=6,
-            #     return_intermediate=True,
-            #     transformerlayers=dict(
-            #         type='DetrTransformerDecoderLayer',
-            #         attn_cfgs=[
-            #             dict(
-            #                 type='MultiheadAttention',
-            #                 embed_dims=_dim_,
-            #                 num_heads=8,
-            #                 dropout=0.1),
-            #              dict(
-            #                 type='CustomMSDeformableAttention',
-            #                 embed_dims=_dim_,
-            #                 num_levels=1),
-            #         ],
-
-            #         feedforward_channels=_ffn_dim_,
-            #         ffn_dropout=0.1,
-            #         operation_order=('self_attn', 'norm', 'cross_attn', 'norm',
-            #                          'ffn', 'norm'))
-            # )
+            decoder=dict(
+                type='DetectionTransformerDecoder',
+                num_layers=6,
+                return_intermediate=True,
+                transformerlayers=dict(
+                    type='DetrTransformerDecoderLayer',
+                    attn_cfgs=[
+                        dict(
+                            type='MultiheadAttention',
+                            embed_dims=_dim_,
+                            num_heads=8,
+                            dropout=0.1),
+                         dict(
+                            type='CustomMSDeformableAttention',
+                            embed_dims=_dim_,
+                            num_levels=1),
+                    ],
+                    feedforward_channels=_ffn_dim_,
+                    ffn_dropout=0.1,
+                    operation_order=('self_attn', 'norm', 'cross_attn', 'norm',
+                                     'ffn', 'norm'))
+            )
         ),
         positional_encoding=dict(
             type='SinePositionalEncoding',
@@ -167,11 +168,11 @@ lr_config = dict(
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
     min_lr_ratio=1e-3)
-total_epochs = 24
+total_epochs = 10
 evaluation = dict(interval=1, pipeline={{_base_.test_pipeline}})
 
 runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
-# load_from = 'ckpts/r101_dcn_fcos3d_pretrain.pth'
+load_from = 'ckpts/r101_fpn_pretrained.pth'
 log_config = dict(
     interval=50,
     hooks=[

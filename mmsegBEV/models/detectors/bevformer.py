@@ -19,6 +19,7 @@ from ..bricks import run_time
 from ..grid_mask import GridMask
 
 from torch.nn.functional import interpolate
+import torchvision.transforms as T
 
 @DETECTORS.register_module()
 class BEVFormer(MVXTwoStageDetector):
@@ -90,8 +91,8 @@ class BEVFormer(MVXTwoStageDetector):
             if self.use_grid_mask:
                 img = self.grid_mask(img)
 
-            img_test = interpolate(img, size=(256, 256))
-            img_feats = self.img_backbone(img_test)
+            resize = T.Resize((256, 256))
+            img_feats = self.img_backbone(resize(img))
             if isinstance(img_feats, dict):
                 img_feats = list(img_feats.values())
         else:
@@ -162,9 +163,7 @@ class BEVFormer(MVXTwoStageDetector):
                           img_metas, 
                           prev_bev,
                           gt_masks_bev 
-                          ):
-                          
-        # print("Forward seg train!")
+                          ):                          
         loss = self.seg_head(img_feats, img_metas, prev_bev, gt_masks_bev)
         return loss
 
@@ -177,12 +176,10 @@ class BEVFormer(MVXTwoStageDetector):
         Returns:
             dict: Losses of different branches.
         """
-        # print("****Forward train from /data/ddoo/projects/bevseg/BEVSegmentation/mmsegBEV/models/detectors/bevformer.py****")
-        # print(gt_masks_bev.shape)
         len_queue = img.size(1)
         prev_img = img[:, :-1, ...]
         img = img[:, -1, ...]
-
+        print(img.shape)
         prev_img_metas = copy.deepcopy(img_metas)
         prev_bev = self.obtain_history_bev(prev_img, prev_img_metas)
 
@@ -198,9 +195,6 @@ class BEVFormer(MVXTwoStageDetector):
 
         for name, val in losses.items():
             outputs[f"loss/{name}"] = val
-        
-        # print("****losses from /data/ddoo/projects/bevseg/BEVSegmentation/mmsegBEV/models/detectors/bevformer.py****")
-        # print(outputs)
         
         return outputs
 

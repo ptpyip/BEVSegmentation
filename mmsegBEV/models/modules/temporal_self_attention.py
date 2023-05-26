@@ -136,7 +136,6 @@ class TemporalSelfAttention(BaseModule):
                 spatial_shapes=None,
                 level_start_index=None,
                 flag='decoder',
-
                 **kwargs):
         """Forward Function of MultiScaleDeformAttention.
 
